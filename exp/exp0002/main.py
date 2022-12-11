@@ -15,7 +15,7 @@ from tqdm import tqdm
 from utils import rmse, AverageMeter, seed_everything
 
 import hydra
-from omegaconf import DictConfig
+from hydra.experimental import compose, initialize_config_dir
 import wandb
 
 def load_data(cfg, root_path):
@@ -255,28 +255,31 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
     return score, losses.avg
 
 
-@hydra.main(config_path='config', config_name='config', version_base=None)
-def main(cfg: DictConfig):
-    seed_everything(cfg.seed)
-
-    if cfg.use_wandb:
-        wandb.login()
-    
+def main():
     exp_path = Path.cwd()
     root_path = Path.cwd().parents[2]
     save_path = root_path / 'outputs' / exp_path.name
     save_path.mkdir(parents=True, exist_ok=True)
 
+    with initialize_config_dir(version_base=None, config_dir=str(exp_path / 'config')):
+        cfg = compose(config_name='config.yaml')
+    
+    seed_everything(cfg.seed)
+
+    if cfg.use_wandb:
+        wandb.login()
+    
     df = load_data(cfg, root_path)
 
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
             continue
-        cfg['fold'] = fold
+
+        cfg.fold = fold
         
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                        name=f'{exp_path.name}')
+                        name=f'{exp_path.name}', config=cfg)
         train_fold_df = df[df['fold'] < fold]
         valid_fold_df = df[df['fold'] == fold]
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
