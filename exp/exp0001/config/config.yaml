@@ -1,5 +1,5 @@
 seed: 77
-use_wandb: False
+use_wandb: True
 wandb_project: signate_hiroshima_test
 water_csv_path: data/timeseries/water.csv
 
@@ -15,6 +15,6 @@ output_sequence_size: 24
 train_bs: 128
 valid_bs: 128
 n_workers: 2
-n_epochs: 30
-lr: 5e-3
+n_epochs: 10
+lr: 1e-2
 weight_decay: 1e-6
