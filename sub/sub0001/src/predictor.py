@@ -13,78 +13,59 @@ from sklearn.metrics import mean_squared_error
 from hydra.experimental import compose, initialize_config_dir
 
 
-def preprocess(cfg, train_fold_df, valid_fold_df):
-    # dataframeの前処理
-    train_fold_df = train_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
-    train_fold_df = train_fold_df.drop(columns=['75', '152'])
-    valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
-    valid_fold_df = valid_fold_df.drop(columns=['75', '152'])
+def preprocess(cfg, df):
+    # string -> floatに (欠損値を全てnanとする)
+    df = df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
 
-    # train_fold_dfの数値部分を標準化
-    train_meta = train_fold_df[['date', 'hour']]
-    train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
-    train_zscore_data = (train_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
-    train_fold_df = pd.concat([train_meta, train_zscore_data], axis=1)
+    # # dataframeの長さがRNNの入力に足りないとき => 前にnanをpadding
+    # if cfg.input_sequence_size > df.shape[0]:
+    #     pad_length = cfg.input_sequence_size - df.shape[0]
+    #     pad = pd.DataFrame(np.full([pad_length, len(df.columns)], None), columns=df.columns)
+    #     df = pd.concat([pad, df])
+    #     # date, hourがnanだが大丈夫かな?
 
-    # valid_fold_dfはtrainの平均と標準偏差で標準化
-    valid_meta = valid_fold_df[['date', 'hour']]
-    valid_data = valid_fold_df.drop(columns=['date', 'hour', 'fold'])
-    valid_zscore_df = (valid_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
-    valid_fold_df = pd.concat([valid_meta, valid_zscore_df], axis=1)
+    # 数値部分(date, hour以外)をnan埋め
+    df_meta = df[['date', 'hour']]
+    df_data = df.drop(columns=['date', 'hour'])
+    df_data = df_data.fillna(method='ffill') # まず新しいデータで前のnanを埋める
+    df_data = df_data.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
+    df_data = df_data.fillna(0.) # 全てがnanなら０埋め
 
-    st2mean = train_data.mean(skipna=True).to_dict()
-    st2std = train_data.std(skipna=True).to_dict()
+    # 標準化
+    df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)
+    df = pd.concat([df_meta, df_zscore_data], axis=1)
+    
+    # 標準化に使った値は後で戻す時のために変数に入れておく
+    st2mean = df_data.mean(skipna=True).to_dict()
+    st2std = df_data.std(skipna=True).to_dict()
     st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
 
-    return train_fold_df, valid_fold_df, st2info
+    return df, st2info
 
 
 class HiroshimaDataset(Dataset):
-    def __init__(self, cfg, df, st2info, phase):
+    def __init__(self, cfg, df, st2info):
         super().__init__()
         self.st2info = st2info
-        # 1. 入力に使える開始日((input_size // 24) + 1)と終了日(最後の24h以外)以内を切り取る
-        # 2. input: (input_size分の時間 ~23hが最後, all station)、target: (24h, all station) でconcat
-        #    stationに対しnullが存在しないデータだけtrain, testのlistに追加
-        self.inputs = []
-        self.targets = []
-        self.stations = []
-        self.borders = []
-
-        first_index = df.index[0]
-        start_row = (((cfg.input_sequence_size-1) // 24) + 1) * 24 # 例えばsequenceの長さが30(時間)の場合、入力に使うのは"2日目の23時までの30時間"にする
-        last_row = len(df) # 最後の行まで使う
-
-         # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
-        for border in range(start_row, last_row, 24):
-            assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
-            input_ = df.iloc[border-cfg.input_sequence_size:border, :].drop(columns=['date', 'hour'])
-            target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
-
-            cat = pd.concat([input_, target]) # 一度concatしてnull値チェック
-            cat = cat.loc[:, ~cat.isnull().any(axis=0)] # input, target共にnullがない列だけ抜き出す
-            self.stations += cat.columns.tolist()
-            self.borders += [first_index + border]*len(cat.columns)
-            input_, target = cat.iloc[:-24], cat.iloc[-24:] # concatを戻す
-            self.inputs += input_.values.T[:, :, np.newaxis].tolist()
-            self.targets += target.values.T.tolist()
-        print(f'{phase} datas: {len(self.inputs)}')
+        inputs_ = df.iloc[-1*cfg.input_sequence_size:].values.T[:, :, np.newaxis]
+        # 入力の長さがRNNの入力に足りないとき => 前にpadding
+        if cfg.input_sequence_size > input_.shape[1]:
+            pad_length = cfg.input_sequence_size - input_.shape[1]
+            pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
+            input_ = np.concatenate([pad, input_])
+        self.inputs = input_.tolist()
+        self.stations = df.drop(columns=['date', 'hour']).columns
 
     def __len__(self):
         return len(self.inputs)
-    
+
     def __getitem__(self, idx):
         input_ = self.inputs[idx]
-        target = self.targets[idx]
+
         meta = self.st2info[self.stations[idx]]
         meta['station'] = self.stations[idx]
-        meta['border'] = self.borders[idx]
-
         input_ = torch.tensor(input_) # input_: (len_of_series, input_size)
-        # TODO padding操作
-        target = torch.tensor(target) # target: (len_of_series)
-
-        return input_, target, meta
+        return input_, meta
 
 
 class Encoder(nn.Module):
@@ -117,11 +98,11 @@ class Decoder(nn.Module):
         return x
 
 
-def load_models(cfg, model_dir):
+def load_models(cfg, model_dir, device):
     models = []
     for model_path in model_dir.glob('*.pth'):
-        encoder = Encoder(cfg.input_size, cfg.hidden_size).to(cfg.device)
-        decoder = Decoder(cfg.hidden_size, cfg.output_size).to(cfg.device)
+        encoder = Encoder(cfg.input_size, cfg.hidden_size).to(device)
+        decoder = Decoder(cfg.hidden_size, cfg.output_size).to(device)
         path_dict = torch.load(model_path)
         encoder.load_state_dict(path_dict['encoder'])
         decoder.load_state_dict(path_dict['decoder'])
@@ -133,32 +114,71 @@ def load_models(cfg, model_dir):
     return models
 
 
+def input2seriesdf(input):
+    date = input['date']
+    stations = input['stations']
+    waterlevel = input['waterlevel']
+
+    # 土台としてsize=(24, len(stations))のnanで埋まったdataframeを作成
+    waterlevel_series = pd.DataFrame(data=np.full([24, len(stations)], None), columns=stations)
+    waterlevel_series['hour'] = np.arange(24)
+
+    # 入力をsize=(24, len(stations))の形に変換
+    waterlevel_input = pd.DataFrame(waterlevel)
+    waterlevel_input = waterlevel_input.pivot(index='hour', columns='station', values='value').reset_index()
+    waterlevel_input.columns.name = None
+    waterlevel_input = waterlevel_input.set_index('hour')
+
+    # 土台に合成
+    waterlevel_series = waterlevel_series.combine_first(waterlevel_input)
+    # 日付のカラムを追加
+    waterlevel_series['date'] = date
+
+    return waterlevel_series
+
+
+def ensemble(preds_all):
+    '''
+        pres_all: List of preds
+            (preds: np.array, size=(len(stations), 24))
+    '''
+    # とりあえず平均取るだけ
+    preds_all = np.mean(preds_all, axis=0)
+    return preds_all
+
+
+def postprocess(preds_all, stations):
+    df = pd.DataFrame(preds_all.T, columns=stations)
+    df.index.name = 'hour'
+    df.columns.name = 'station'
+    output = df.stack().reset_index().rename(columns={0: 'value'}).to_dict('records')
+    return output
+
+
 class ScoringService(object):
     @classmethod
     def get_model(cls, model_path):
-        """Get model method
+        """
+        Get model method
         Args:
             model_path (str): Path to the trained model directory.
         Returns:
             bool: The return value. True for success, False otherwise.
         """
-        # try:
-        root_dir = Path(model_path).parent
+        cls.water_df = None
+        cls.rain_df = None
+        cls.tide_df = None
+        cls.device = device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+        root_dir = Path(model_path).parent
+        
         with initialize_config_dir(config_dir=root_dir / 'src' / 'config'):
             cfg = compose(config_name='config.yaml')
             cls.cfg = cfg
         
-        cls.model = load_models(cfg, model_path)
-        # with open(reference_meta_path) as f:
-        #     reference_meta = json.load(f)
-        # embeddings, ids = make_reference(
-        #     cfg, reference_path, reference_meta, cls.model)
-        # cls.embeddings = embeddings
-        # cls.ids = ids
+        cls.models = load_models(cfg, model_path, device)
+
         return True
-        # except:
-        #     return False
 
     @classmethod
     def predict(cls, input):
@@ -168,12 +188,57 @@ class ScoringService(object):
         Returns:
             dict: Inference for the given input.
         """
-        stations = input['stations']
-        waterlevel = input['waterlevel']
-        merged = pd.merge(pd.DataFrame(stations, columns=['station']), pd.DataFrame(waterlevel))
-        merged['value'] = merged['value'].replace({'M':0.0, '*':0.0, '-':0.0, '--': 0.0, '**':0.0})
-        merged['value'] = merged['value'].fillna(0.0)
-        merged['value'] = merged['value'].astype(float)
-        prediction = merged[['hour', 'station', 'value']].to_dict('records')
 
-        return prediction
+        cfg = cls.cfg
+
+        # input -> stationがcolumnの、長さ24(時間分)のdataframe
+        waterlevel_series = input2seriesdf(input)
+        
+        # 過去のdfと結合
+        if cls.water_df is None:
+            cls.water_df = waterlevel_series.copy()
+        else:
+            cls.water_df = pd.concat([cls.water_df, waterlevel_series]).reset_index()
+        
+        # 前処理
+        input_df = cls.water_df.loc[:, input['stations']]
+        input_df, st2info = preprocess(cfg, input_df) # df: date, hour, station_1, ..., station_n 
+
+        # dataloaderの用意
+        test_ds = HiroshimaDataset(cfg, input_df, st2info)
+        test_loader = DataLoader(
+            test_ds,
+            batch_size=cfg.valid_bs,
+            shuffle=False,
+            num_workers=cfg.n_workers,
+            pin_memory=True
+        )
+
+        # 予測結果を入れる
+        preds_all = []
+        stations = []
+
+        # 予測
+        for i, (encoder, decoder) in enumerate(cls.models):
+            preds_one_model = []
+            
+            for (data, meta) in test_loader:
+                data = data.to(cls.device).float()
+
+                with torch.no_grad():
+                    h, c = encoder(data)
+                    repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1)
+                    pred = decoder(repeat_input, (h, c)).squeeze()
+
+                    preds = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+                    preds_one_model.append(preds)
+                    
+                if i == 0:
+                    stations += meta['station']
+            
+            preds_one_model = np.concatenate(preds_one_model)
+            preds_all.append(preds_one_model)
+        
+        preds_all = ensemble(preds_all)
+        output = postprocess(preds_all, stations)
+        return output
