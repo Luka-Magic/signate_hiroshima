@@ -97,7 +97,7 @@ class HiroshimaDataset(Dataset):
                 pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
                 print(input_.shape)
                 print(pad.shape)
-                input_ = np.concatenate([pad, input_])
+                input_ = np.concatenate([pad, input_], axis=1)
             
             self.inputs_ += input_.tolist()
             self.targets += target.values.T.tolist()

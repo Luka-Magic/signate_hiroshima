@@ -52,7 +52,7 @@ class HiroshimaDataset(Dataset):
         if cfg.input_sequence_size > input_.shape[1]:
             pad_length = cfg.input_sequence_size - input_.shape[1]
             pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
-            input_ = np.concatenate([pad, input_])
+            input_ = np.concatenate([pad, input_], axis=1)
         self.inputs = input_.tolist()
         self.stations = df.drop(columns=['date', 'hour']).columns
 
