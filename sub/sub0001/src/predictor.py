@@ -37,7 +37,7 @@ class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info):
         super().__init__()
         self.st2info = st2info
-        inputs_ = df.iloc[-1*cfg.input_sequence_size:].values.T[:, :, np.newaxis]
+        input_ = df.iloc[-1*cfg.input_sequence_size:].values.T[:, :, np.newaxis]
         # 入力の長さがRNNの入力に足りないとき => 前にpadding
         if cfg.input_sequence_size > input_.shape[1]:
             pad_length = cfg.input_sequence_size - input_.shape[1]
