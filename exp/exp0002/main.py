@@ -89,11 +89,14 @@ class HiroshimaDataset(Dataset):
             self.borders += [first_index + border]*len(target.columns)
             input_ = input_.loc[:, target.columns] # targetに使われるinputだけ取り出す
             input_ = input_.values.T[:, :, np.newaxis] # size=(len(station), len(時間), 1)
+            print(input_.shape)
 
             # 入力の長さがRNNの入力に足りないとき => 前にpadding
             if cfg.input_sequence_size > input_.shape[1]:
                 pad_length = cfg.input_sequence_size - input_.shape[1]
                 pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
+                print(input_.shape)
+                print(pad.shape)
                 input_ = np.concatenate([pad, input_])
             
             self.inputs_ += input_.tolist()
