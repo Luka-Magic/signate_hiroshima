@@ -261,7 +261,7 @@ def main():
     save_path = root_path / 'outputs' / exp_path.name
     save_path.mkdir(parents=True, exist_ok=True)
 
-    with initialize_config_dir(version_base=None, config_dir=str(exp_path / 'config')):
+    with initialize_config_dir(config_dir=str(exp_path / 'config')):
         cfg = compose(config_name='config.yaml')
     
     seed_everything(cfg.seed)
