@@ -263,7 +263,7 @@ def main(cfg: DictConfig):
         
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                        name=f'{exp_path.name}_fold{fold}')
+                        name=f'{exp_path.name}')
         train_fold_df = df[df['fold'] < fold]
         valid_fold_df = df[df['fold'] == fold]
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
@@ -310,6 +310,7 @@ def main(cfg: DictConfig):
             if cfg.use_wandb:
                 wandb.log(wandb_dict)
         
+        wandb.finish()
         del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
         gc.collect()
         torch.cuda.empty_cache()
