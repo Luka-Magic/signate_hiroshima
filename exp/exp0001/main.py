@@ -305,7 +305,7 @@ def main(cfg: DictConfig):
                     'encoder': encoder.state_dict(),
                     'decoder': decoder.state_dict(),
                 }
-                torch.save(save_dict, str(save_path / 'best_score.pth'))
+                torch.save(save_dict, str(save_path / f'best_score_fold{fold}.pth'))
                 print(f'score update!: {best_dict["score"]:.4f}')
             
             if cfg.use_wandb:
