@@ -238,6 +238,7 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
 
 @hydra.main(config_path='config', config_name='config', version_base=None)
 def main(cfg: DictConfig):
+    print('start main')
     seed_everything(cfg.seed)
 
     if cfg.use_wandb:
@@ -250,8 +251,10 @@ def main(cfg: DictConfig):
 
     df = load_data(cfg, root_path)
 
+    print('load complate')
+
     for fold in range(cfg.n_folds):
-        if fold not in cfg.use_fold:
+        if fold not in cfg.use_folds:
             continue
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',

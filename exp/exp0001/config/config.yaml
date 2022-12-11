@@ -4,7 +4,7 @@ wandb_project: signate_hiroshima_test
 water_csv_path: data/timeseries/water.csv
 
 n_folds: 3
-use_fold: [0, 1, 2]
+use_folds: [0, 1, 2]
 
 device: 'cuda' if torch.cuda.is_available() else 'cpu'
 input_size: 1
