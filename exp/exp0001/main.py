@@ -83,6 +83,7 @@ class HiroshimaDataset(Dataset):
             input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
             input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
             input_ = input_.fillna(0.) # 全てがnanなら０埋め
+            
             target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
 
             target = target.loc[:, ~target.isnull().any(axis=0)] # input, target共にnullがない列だけ抜き出す

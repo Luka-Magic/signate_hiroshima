@@ -37,15 +37,23 @@ class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info):
         super().__init__()
         self.st2info = st2info
-        input_ = df.iloc[-1*cfg.input_sequence_size:].values.T[:, :, np.newaxis]
+        
+        input_ = df.iloc[-1*cfg.input_sequence_size:].drop(columns=['date', 'hour'])
+
+        # nan埋め
+        input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
+        input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
+        input_ = input_.fillna(0.) # 全てがnanなら０埋め
+
+        # dataframe -> np.array
+        input_ = input_.values.T[:, :, np.newaxis]
+
         # 入力の長さがRNNの入力に足りないとき => 前にpadding
         if cfg.input_sequence_size > input_.shape[1]:
             pad_length = cfg.input_sequence_size - input_.shape[1]
             pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
             input_ = np.concatenate([pad, input_], axis=1)
-            input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
-            input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
-            input_ = input_.fillna(0.) # 全てがnanなら０埋め
+        
         self.inputs = input_.tolist()
         self.stations = df.drop(columns=['date', 'hour']).columns
 
