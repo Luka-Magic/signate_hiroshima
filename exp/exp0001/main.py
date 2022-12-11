@@ -20,7 +20,6 @@ import wandb
 
 def load_data(cfg, root_path):
     df = pd.read_csv(str(root_path / cfg.water_csv_path))
-    df = df.drop(columns=['75', '152'])
     dates = df['date'].astype(int).unique()
     dates.sort()
     folds = TimeSeriesSplit(n_splits=cfg.n_folds).split(dates)
@@ -31,6 +30,12 @@ def load_data(cfg, root_path):
 
 
 def preprocess(cfg, train_fold_df, valid_fold_df):
+    # dataframeの前処理
+    train_fold_df = train_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
+    train_fold_df = train_fold_df.drop(columns=['75', '152'])
+    valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
+    valid_fold_df = valid_fold_df.drop(columns=['75', '152'])
+
     # train_fold_dfの数値部分を標準化
     train_meta = train_fold_df[['date', 'hour']]
     train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
