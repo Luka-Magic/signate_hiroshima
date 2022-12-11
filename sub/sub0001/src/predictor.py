@@ -27,9 +27,9 @@ def preprocess(cfg, df):
     # 数値部分(date, hour以外)をnan埋め
     df_meta = df[['date', 'hour']]
     df_data = df.drop(columns=['date', 'hour'])
-    df_data = df_data.fillna(method='ffill') # まず新しいデータで前のnanを埋める
-    df_data = df_data.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
-    df_data = df_data.fillna(0.) # 全てがnanなら０埋め
+    # df_data = df_data.fillna(method='ffill') # まず新しいデータで前のnanを埋める
+    # df_data = df_data.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
+    # df_data = df_data.fillna(0.) # 全てがnanなら０埋め
 
     # 標準化
     df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)
@@ -53,6 +53,9 @@ class HiroshimaDataset(Dataset):
             pad_length = cfg.input_sequence_size - input_.shape[1]
             pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
             input_ = np.concatenate([pad, input_], axis=1)
+            input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
+            input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
+            input_ = input_.fillna(0.) # 全てがnanなら０埋め
         self.inputs = input_.tolist()
         self.stations = df.drop(columns=['date', 'hour']).columns
 
