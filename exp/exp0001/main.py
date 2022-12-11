@@ -1,4 +1,5 @@
 from pathlib import Path
+import gc
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -231,14 +232,12 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
     preds_all = np.concatenate(preds_all)
     targets_all = np.concatenate(targets_all)
     score = rmse(targets_all, preds_all)
-    score_table = np.sqrt((preds_all - targets_all)**2)
 
     print(f'Valid - Epoch {epoch}: losses {losses.avg:.4f}, scores {score:.4f}')
-    return score, losses.avg, score_table
+    return score, losses.avg
 
-@hydra.main(config_path='config', config_name='config', version_base='1.1')
+@hydra.main(config_path='config', config_name='config', version_base=None)
 def main(cfg: DictConfig):
-    print('start main')
     seed_everything(cfg.seed)
 
     if cfg.use_wandb:
@@ -251,8 +250,6 @@ def main(cfg: DictConfig):
 
     df = load_data(cfg, root_path)
 
-    print('load complate')
-
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
             continue
@@ -264,8 +261,8 @@ def main(cfg: DictConfig):
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
         valid_fold_df = valid_fold_df.sort_values(['date', 'hour'])
 
-        train_fold_df_p, valid_fold_df_p, st2info = preprocess(cfg, train_fold_df, valid_fold_df)
-        train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df_p, valid_fold_df_p, st2info)
+        train_fold_df, valid_fold_df, st2info = preprocess(cfg, train_fold_df, valid_fold_df)
+        train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info)
 
         device = torch.device(cfg.device)
 
@@ -286,7 +283,7 @@ def main(cfg: DictConfig):
             # 学習
             train_score, train_loss = train_one_epoch(cfg, epoch, train_loader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer)
             # 推論
-            valid_score, valid_loss, table = valid_one_epoch(cfg, epoch, valid_loader, encoder, decoder, loss_fn, device)
+            valid_score, valid_loss = valid_one_epoch(cfg, epoch, valid_loader, encoder, decoder, loss_fn, device)
 
             wandb_dict = dict(
                 epoch=epoch,
@@ -302,3 +299,10 @@ def main(cfg: DictConfig):
                 }
                 torch.save(save_dict, str(save_path))
             wandb.log(wandb_dict)
+        
+        del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, optim, scheduler, reg_criterion, loss_fn, scaler
+        gc.collect()
+        torch.cuda.empty_cache()
+
+if __name__ == '__main__':
+    main()
