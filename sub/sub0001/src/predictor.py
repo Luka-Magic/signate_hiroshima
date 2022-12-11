@@ -195,13 +195,12 @@ class ScoringService(object):
 
         # input -> stationがcolumnの、長さ24(時間分)のdataframe
         waterlevel_series = input2seriesdf(input)
-        print(waterlevel_series.head())
         
         # 過去のdfと結合
         if cls.water_df is None:
             cls.water_df = waterlevel_series.copy()
         else:
-            cls.water_df = pd.concat([cls.water_df, waterlevel_series]).reset_index()
+            cls.water_df = pd.concat([cls.water_df, waterlevel_series]).reset_index(drop=True)
         
         # 前処理
         input_columns = list(input['stations']) + ['date', 'hour']
