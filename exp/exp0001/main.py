@@ -236,7 +236,7 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
     print(f'Valid - Epoch {epoch}: losses {losses.avg:.4f}, scores {score:.4f}')
     return score, losses.avg, score_table
 
-@hydra.main(config_path='config', config_name='config', version_base=None)
+@hydra.main(config_path='config', config_name='config', version_base='1.1')
 def main(cfg: DictConfig):
     print('start main')
     seed_everything(cfg.seed)
