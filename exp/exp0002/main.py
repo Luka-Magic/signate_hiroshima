@@ -43,7 +43,7 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
     train_data = train_data.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
     train_data = train_data.fillna(0.) # 全てがnanなら０埋め
 
-    ## 標準化
+    ## train_fold_dfの標準化
     train_zscore_data = (train_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
     train_fold_df = pd.concat([train_meta, train_zscore_data], axis=1)
 
@@ -81,7 +81,7 @@ class HiroshimaDataset(Dataset):
         for border in tqdm(range(start_row, last_row, 24)):
             assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
             
-            input_ = df.iloc[border-cfg.input_sequence_size:border, :].drop(columns=['date', 'hour'])
+            input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
             target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
 
             target = target.loc[:, ~target.isnull().any(axis=0)] # input, target共にnullがない列だけ抜き出す
