@@ -20,7 +20,7 @@ import wandb
 
 def load_data(cfg, root_path):
     df = pd.read_csv(str(root_path / cfg.water_csv_path))
-    dates = df['data'].astype(int).unique()
+    dates = df['date'].astype(int).unique()
     dates.sort()
     folds = TimeSeriesSplit(n_splits=cfg.n_folds).split(dates)
     df['fold'] = -1
