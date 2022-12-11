@@ -17,19 +17,9 @@ def preprocess(cfg, df):
     # string -> floatに (欠損値を全てnanとする)
     df = df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
 
-    # # dataframeの長さがRNNの入力に足りないとき => 前にnanをpadding
-    # if cfg.input_sequence_size > df.shape[0]:
-    #     pad_length = cfg.input_sequence_size - df.shape[0]
-    #     pad = pd.DataFrame(np.full([pad_length, len(df.columns)], None), columns=df.columns)
-    #     df = pd.concat([pad, df])
-    #     # date, hourがnanだが大丈夫かな?
-
     # 数値部分(date, hour以外)をnan埋め
     df_meta = df[['date', 'hour']]
     df_data = df.drop(columns=['date', 'hour'])
-    # df_data = df_data.fillna(method='ffill') # まず新しいデータで前のnanを埋める
-    # df_data = df_data.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
-    # df_data = df_data.fillna(0.) # 全てがnanなら０埋め
 
     # 標準化
     df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)

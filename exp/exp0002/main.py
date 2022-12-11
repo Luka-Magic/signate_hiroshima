@@ -272,6 +272,7 @@ def main(cfg: DictConfig):
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
             continue
+        cfg.fold = fold
         
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
