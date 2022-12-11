@@ -318,7 +318,7 @@ def main():
                 valid_score=valid_score, valid_loss=valid_loss
             )
             if valid_score < best_dict['score']:
-                wandb.run.summary['score'] = best_dict['score']
+                wandb.run.summary['best_score'] = best_dict['score']
                 best_dict['score'] = valid_score
                 save_dict = {
                     'epoch': epoch,
@@ -327,7 +327,9 @@ def main():
                 }
                 torch.save(save_dict, str(save_path / f'best_score_fold{fold}.pth'))
                 print(f'score update!: {best_dict["score"]:.4f}')
-            
+            if valid_loss < best_dict['loss']:
+                wandb.run.summary['best_loss'] = best_dict['loss']
+                best_dict['loss'] = valid_loss
             if cfg.use_wandb:
                 wandb.log(wandb_dict)
         
