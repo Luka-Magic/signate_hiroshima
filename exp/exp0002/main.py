@@ -274,12 +274,11 @@ def main():
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
             continue
-
-        cfg.fold = fold
         
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
                         name=f'{exp_path.name}', config=cfg)
+            wandb.config.fold = fold
         train_fold_df = df[df['fold'] < fold]
         valid_fold_df = df[df['fold'] == fold]
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
