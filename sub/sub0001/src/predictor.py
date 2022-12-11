@@ -163,7 +163,8 @@ class ScoringService(object):
         cls.tide_df = None
         cls.device = device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        root_dir = Path(model_path).parent.resolve()
+        model_path = Path(model_path)
+        root_dir = model_path.parent.resolve()
         
         with initialize_config_dir(config_dir=str(root_dir / 'src' / 'config')):
             cfg = compose(config_name='config.yaml')

@@ -19,7 +19,7 @@ from omegaconf import OmegaConf
 from hydra.experimental import compose, initialize_config_dir
 import wandb
 
-def load_data(cfg, root_path):
+def load_data(cfg, root_path):  
     df = pd.read_csv(str(root_path / cfg.water_csv_path))
     dates = df['date'].astype(int).unique()
     dates.sort()
