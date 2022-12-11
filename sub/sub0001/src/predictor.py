@@ -99,11 +99,11 @@ class Decoder(nn.Module):
         return x
 
 
-def load_models(cfg, model_dir, device):
+def load_models(cfg, model_dir):
     models = []
     for model_path in model_dir.glob('*.pth'):
-        encoder = Encoder(cfg.input_size, cfg.hidden_size).to(device)
-        decoder = Decoder(cfg.hidden_size, cfg.output_size).to(device)
+        encoder = Encoder(cfg.input_size, cfg.hidden_size)
+        decoder = Decoder(cfg.hidden_size, cfg.output_size)
         path_dict = torch.load(model_path)
         encoder.load_state_dict(path_dict['encoder'])
         decoder.load_state_dict(path_dict['decoder'])
@@ -169,7 +169,7 @@ class ScoringService(object):
         cls.water_df = None
         cls.rain_df = None
         cls.tide_df = None
-        cls.device = device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        cls.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         model_path = Path(model_path)
         root_dir = model_path.parent.resolve()
@@ -178,7 +178,7 @@ class ScoringService(object):
             cfg = compose(config_name='config.yaml')
             cls.cfg = cfg
         
-        cls.models = load_models(cfg, model_path, device)
+        cls.models = load_models(cfg, model_path)
 
         return True
 
@@ -222,8 +222,10 @@ class ScoringService(object):
         stations = []
 
         # 予測
-        for i, (encoder, decoder) in enumerate(cls.models):
+        for i, (models) in enumerate(cls.models):
             preds_one_model = []
+            encoder = models['encoder'].to(cls.device)
+            decoder = models['decoder'].to(cls.device)
             
             for (data, meta) in test_loader:
                 data = data.to(cls.device).float()
