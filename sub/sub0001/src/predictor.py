@@ -195,7 +195,8 @@ class ScoringService(object):
             cls.water_df = pd.concat([cls.water_df, waterlevel_series]).reset_index()
         
         # 前処理
-        input_df = cls.water_df.loc[:, input['stations']]
+        input_columns = list(input['stations']) + ['date', 'hour']
+        input_df = cls.water_df.loc[:, input_columns]
         input_df, st2info = preprocess(cfg, input_df) # df: date, hour, station_1, ..., station_n 
 
         # dataloaderの用意
