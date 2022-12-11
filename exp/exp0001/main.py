@@ -197,7 +197,7 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
     targets_all = np.concatenate(targets_all)
     score = rmse(targets_all, preds_all)
     
-    print(f'Train - Epoch {epoch:.4f}: losses {losses.avg:.4f}, scores: {score}')
+    print(f'Train - Epoch {epoch}: losses {losses.avg:.4f}, scores: {score}')
     return score, losses.avg
 
 
@@ -287,7 +287,7 @@ def main(cfg: DictConfig):
             score=0.,
             loss=float('inf'),
         )
-        for epoch in tqdm(range(cfg.n_epochs)):
+        for epoch in range(1, cfg.n_epochs+1):
             # 学習
             train_score, train_loss = train_one_epoch(cfg, epoch, train_loader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer)
             # 推論
@@ -306,7 +306,9 @@ def main(cfg: DictConfig):
                     'decoder': decoder.state_dict(),
                 }
                 torch.save(save_dict, str(save_path))
-            wandb.log(wandb_dict)
+            
+            if cfg.use_wandb:
+                wandb.log(wandb_dict)
         
         del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
         gc.collect()
