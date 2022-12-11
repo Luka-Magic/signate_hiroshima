@@ -1,14 +1,9 @@
 from pathlib import Path
-import gc
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_squared_error
 
 from hydra.experimental import compose, initialize_config_dir
 
