@@ -6,7 +6,7 @@ water_csv_path: data/timeseries/water.csv
 n_folds: 3
 use_folds: [0, 1, 2]
 
-device: 'cuda' if torch.cuda.is_available() else 'cpu'
+device: cuda
 input_size: 1
 hidden_size: 128
 output_size: 1
