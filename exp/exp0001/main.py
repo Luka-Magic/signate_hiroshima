@@ -20,6 +20,7 @@ import wandb
 
 def load_data(cfg, root_path):
     df = pd.read_csv(str(root_path / cfg.water_csv_path))
+    df = df.drop(columns=['75', '152'])
     dates = df['date'].astype(int).unique()
     dates.sort()
     folds = TimeSeriesSplit(n_splits=cfg.n_folds).split(dates)
@@ -78,6 +79,7 @@ class HiroshimaDataset(Dataset):
             input_, target = cat.iloc[:-24], cat.iloc[-24:] # concatを戻す
             self.inputs += input_.values.T[:, :, np.newaxis].tolist()
             self.targets += target.values.T.tolist()
+        print(f'{phase} datas: {len(self.inputs)}')
 
     def __len__(self):
         return len(self.inputs)
@@ -253,9 +255,10 @@ def main(cfg: DictConfig):
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
             continue
+        
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                        name=f'{exp_path.name}')
+                        name=f'{exp_path.name}_fold{fold}')
         train_fold_df = df[df['fold'] < fold]
         valid_fold_df = df[df['fold'] == fold]
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
@@ -300,7 +303,7 @@ def main(cfg: DictConfig):
                 torch.save(save_dict, str(save_path))
             wandb.log(wandb_dict)
         
-        del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, optim, scheduler, reg_criterion, loss_fn, scaler
+        del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
         gc.collect()
         torch.cuda.empty_cache()
 
