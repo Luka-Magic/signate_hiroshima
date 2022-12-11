@@ -165,7 +165,7 @@ class ScoringService(object):
 
         root_dir = Path(model_path).parent
         
-        with initialize_config_dir(config_dir=root_dir / 'src' / 'config'):
+        with initialize_config_dir(config_dir=str(root_dir / 'src' / 'config')):
             cfg = compose(config_name='config.yaml')
             cls.cfg = cfg
         

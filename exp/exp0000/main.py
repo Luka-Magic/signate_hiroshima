@@ -15,7 +15,7 @@ from tqdm import tqdm
 from utils import rmse, AverageMeter, seed_everything
 
 import hydra
-from hydra.experimental import compose, initialize_config_dir
+from omegaconf import DictConfig
 import wandb
 
 def load_data(cfg, root_path):
@@ -36,11 +36,9 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
     valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
     valid_fold_df = valid_fold_df.drop(columns=['75', '152'])
 
-    # train_fold_dfの数値部分(date, hour以外)をnan埋め
+    # train_fold_dfの数値部分を標準化
     train_meta = train_fold_df[['date', 'hour']]
     train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
-
-    ## train_fold_dfの標準化
     train_zscore_data = (train_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
     train_fold_df = pd.concat([train_meta, train_zscore_data], axis=1)
 
@@ -50,7 +48,6 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
     valid_zscore_df = (valid_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
     valid_fold_df = pd.concat([valid_meta, valid_zscore_df], axis=1)
 
-    # 標準化に使った値は後で戻す時のために変数に入れておく
     st2mean = train_data.mean(skipna=True).to_dict()
     st2std = train_data.std(skipna=True).to_dict()
     st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
@@ -62,8 +59,8 @@ class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info, phase):
         super().__init__()
         self.st2info = st2info
-        # 1. 入力に使える開始日と終了日(最後の24h以外)以内を切り取る
-        # 2. input: (input_size分の時間 ~23hが最後, all station)、target: (24h, all station)
+        # 1. 入力に使える開始日((input_size // 24) + 1)と終了日(最後の24h以外)以内を切り取る
+        # 2. input: (input_size分の時間 ~23hが最後, all station)、target: (24h, all station) でconcat
         #    stationに対しnullが存在しないデータだけtrain, testのlistに追加
         self.inputs = []
         self.targets = []
@@ -71,32 +68,21 @@ class HiroshimaDataset(Dataset):
         self.borders = []
 
         first_index = df.index[0]
-        start_row = 24 # 例えばsequenceの長さが30(時間)の場合、入力に使うのは"2日目の23時までの30時間"にする
+        start_row = (((cfg.input_sequence_size-1) // 24) + 1) * 24 # 例えばsequenceの長さが30(時間)の場合、入力に使うのは"2日目の23時までの30時間"にする
         last_row = len(df) # 最後の行まで使う
 
          # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
         for border in tqdm(range(start_row, last_row, 24)):
             assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
-            
-            input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
-            input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
-            input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
-            input_ = input_.fillna(0.) # 全てがnanなら０埋め
+            input_ = df.iloc[border-cfg.input_sequence_size:border, :].drop(columns=['date', 'hour'])
             target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
 
-            target = target.loc[:, ~target.isnull().any(axis=0)] # input, target共にnullがない列だけ抜き出す
-            self.stations += target.columns.tolist()
-            self.borders += [first_index + border]*len(target.columns)
-            input_ = input_.loc[:, target.columns] # targetに使われるinputだけ取り出す
-            input_ = input_.values.T[:, :, np.newaxis] # size=(len(station), len(時間), 1)
-
-            # 入力の長さがRNNの入力に足りないとき => 前にpadding
-            if cfg.input_sequence_size > input_.shape[1]:
-                pad_length = cfg.input_sequence_size - input_.shape[1]
-                pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
-                input_ = np.concatenate([pad, input_], axis=1)
-            
-            self.inputs += input_.tolist()
+            cat = pd.concat([input_, target]) # 一度concatしてnull値チェック
+            cat = cat.loc[:, ~cat.isnull().any(axis=0)] # input, target共にnullがない列だけ抜き出す
+            self.stations += cat.columns.tolist()
+            self.borders += [first_index + border]*len(cat.columns)
+            input_, target = cat.iloc[:-24], cat.iloc[-24:] # concatを戻す
+            self.inputs += input_.values.T[:, :, np.newaxis].tolist()
             self.targets += target.values.T.tolist()
         print(f'{phase} datas: {len(self.inputs)}')
 
@@ -246,6 +232,9 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
             target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
             preds_all += [pred]
             targets_all += [target]
+        # if step == 3:
+        #     plot_result(data, pred, target, meta)
+
 
     preds_all = np.concatenate(preds_all)
     targets_all = np.concatenate(targets_all)
@@ -254,21 +243,18 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
     print(f'Valid - Epoch {epoch}: losses {losses.avg:.4f}, scores {score:.4f}')
     return score, losses.avg
 
-
-def main():
-    exp_path = Path.cwd()
-    root_path = Path.cwd().parents[2]
-    save_path = root_path / 'outputs' / exp_path.name
-    save_path.mkdir(parents=True, exist_ok=True)
-
-    with initialize_config_dir(config_dir=str(exp_path / 'config')):
-        cfg = compose(config_name='config.yaml')
-    
+@hydra.main(config_path='config', config_name='config', version_base=None)
+def main(cfg: DictConfig):
     seed_everything(cfg.seed)
 
     if cfg.use_wandb:
         wandb.login()
     
+    exp_path = Path.cwd()
+    root_path = Path.cwd().parents[2]
+    save_path = root_path / 'outputs' / exp_path.name
+    save_path.mkdir(parents=True, exist_ok=True)
+
     df = load_data(cfg, root_path)
 
     for fold in range(cfg.n_folds):
@@ -277,8 +263,7 @@ def main():
         
         if cfg.use_wandb:
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                        name=f'{exp_path.name}', config=cfg)
-            wandb.config.fold = fold
+                        name=f'{exp_path.name}')
         train_fold_df = df[df['fold'] < fold]
         valid_fold_df = df[df['fold'] == fold]
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
@@ -314,7 +299,6 @@ def main():
                 valid_score=valid_score, valid_loss=valid_loss
             )
             if valid_score < best_dict['score']:
-                wandb.run.summary['score'] = best_dict['score']
                 best_dict['score'] = valid_score
                 save_dict = {
                     'epoch': epoch,
