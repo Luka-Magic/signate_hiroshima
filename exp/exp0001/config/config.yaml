@@ -1,0 +1,20 @@
+seed: 77
+use_wandb: False
+wandb_project: signate_hiroshima_test
+water_csv_path: data/timeseries/water.csv
+
+n_folds: 3
+use_fold: [0, 1, 2]
+
+device: 'cuda' if torch.cuda.is_available() else 'cpu'
+input_size: 1
+hidden_size: 128
+output_size: 1
+input_sequence_size: 30
+output_sequence_size: 24
+train_bs: 128
+valid_bs: 128
+n_workers: 2
+n_epochs: 30
+lr: 5e-3
+weight_decay: 1e-6
