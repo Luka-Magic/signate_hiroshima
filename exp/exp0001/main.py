@@ -284,7 +284,7 @@ def main(cfg: DictConfig):
         decoder_optimizer = torch.optim.AdamW(
             decoder.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
         best_dict = dict(
-            score=0.,
+            score=float('inf'),
             loss=float('inf'),
         )
         for epoch in range(1, cfg.n_epochs+1):
@@ -306,6 +306,7 @@ def main(cfg: DictConfig):
                     'decoder': decoder.state_dict(),
                 }
                 torch.save(save_dict, str(save_path / 'best_score.pth'))
+                print(f'score update!: {best_dict["score"]:.4f}')
             
             if cfg.use_wandb:
                 wandb.log(wandb_dict)
