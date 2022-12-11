@@ -99,7 +99,7 @@ def load_models(cfg, model_dir):
     for model_path in model_dir.glob('*.pth'):
         encoder = Encoder(cfg.input_size, cfg.hidden_size)
         decoder = Decoder(cfg.hidden_size, cfg.output_size)
-        path_dict = torch.load(model_path)
+        path_dict = torch.load(model_path, map_location='cpu')
         encoder.load_state_dict(path_dict['encoder'])
         decoder.load_state_dict(path_dict['decoder'])
         model = {
@@ -164,7 +164,7 @@ class ScoringService(object):
         cls.water_df = None
         cls.rain_df = None
         cls.tide_df = None
-        cls.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        cls.device = 'cpu'
 
         model_path = Path(model_path)
         root_dir = model_path.parent.resolve()
