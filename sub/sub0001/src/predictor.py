@@ -24,7 +24,7 @@ def preprocess(cfg, df):
     st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
 
     return df, st2info
-
+    
 
 class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info):
@@ -141,10 +141,18 @@ def ensemble(preds_all):
     return preds_all
 
 def postprocess(preds_all, stations):
-    df = pd.DataFrame(preds_all.T, columns=stations)
+    df = pd.DataFrame(preds_all.T, columns=stations).astype(float)
     assert len(df) == 24, 'dataframeの高さが24時間になってない。'
     df.index.name = 'hour'
     df.columns.name = 'station'
+
+    # formatを整える & nan埋め
+    df['hour'] = df['hour'].astype(int)
+    df['station'] = df['station'].astype(str)
+    df = df.fillna(method='ffill')
+    df = df.fillna(method='bfill') 
+    df = df.fillna(df.mean())
+
     output = df.stack().reset_index().rename(columns={0: 'value'}).to_dict('records')
     return output
 
@@ -202,7 +210,7 @@ class ScoringService(object):
         preds_all = []
 
         # 予測
-        for i, (models) in enumerate(cls.models):
+        for models in cls.models:
             preds_one_model = []
             encoder = models['encoder'].to(cls.device)
             decoder = models['decoder'].to(cls.device)
