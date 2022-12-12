@@ -158,9 +158,9 @@ def ensemble(preds_all):
 #     output = df.to_dict('records')
 #     return output
 
-def postprocess(preds_all, output_df):
+def postprocess(preds_all, df):
     value = preds_all.reshape(-1)
-    output_df['value'] = value
+    df['value'] = value
     
     # formatを整える & nan埋め
     df = df.fillna(method='ffill')
