@@ -193,7 +193,6 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
         repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
         pred = decoder(repeat_input, (h, c)).squeeze() # decoder_output: (bs, len_of_series,)
 
-
         loss = 0
         for i in range(pred.size()[1]):
             loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目を0としている
