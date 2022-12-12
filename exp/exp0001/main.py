@@ -63,7 +63,7 @@ class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info, phase):
         super().__init__()
         self.st2info = st2info
-        
+
         self.inputs = []
         self.targets = []
         self.stations = []
@@ -111,7 +111,6 @@ class HiroshimaDataset(Dataset):
         meta['border'] = self.borders[idx]
 
         input_ = torch.tensor(input_) # input_: (len_of_series, input_size)
-        # TODO padding操作
         target = torch.tensor(target) # target: (len_of_series)
 
         return input_, target, meta

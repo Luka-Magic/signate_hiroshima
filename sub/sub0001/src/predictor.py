@@ -148,7 +148,6 @@ def postprocess(preds_all, stations):
     output = df.stack().reset_index().rename(columns={0: 'value'}).to_dict('records')
     return output
 
-
 class ScoringService(object):
     @classmethod
     def get_model(cls, model_path):
@@ -200,7 +199,6 @@ class ScoringService(object):
 
         # 予測結果を入れる
         preds_all = []
-        stations = []
 
         # 予測
         for i, (models) in enumerate(cls.models):
@@ -218,13 +216,13 @@ class ScoringService(object):
 
                     preds = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
                     preds_one_model.append(preds)
-                    
-                if i == 0:
-                    stations += meta['station']
+                
+                # if i == 0:
+                #     stations += meta['station']
             
             preds_one_model = np.concatenate(preds_one_model)
             preds_all.append(preds_one_model)
         
         preds_all = ensemble(preds_all)
-        output = postprocess(preds_all, stations)
+        output = postprocess(preds_all, input_df.drop(columns=['date', 'hour']).columns)
         return output
