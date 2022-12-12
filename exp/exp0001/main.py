@@ -170,7 +170,7 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
     return train_loader, valid_loader
 
 
-def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, scheduler=None):
+def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time):
     def get_lr(optimizer):
         for param_group in optimizer.param_groups:
             return param_group['lr']
@@ -203,12 +203,19 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
         loss.backward()
         encoder_optimizer.step()
         decoder_optimizer.step()
+        if encoder_scheduler is not None and scheduler_step_time=='step':
+            encoder_scheduler.step()
+            decoder_scheduler.step()
 
         losses.update(loss.item(), len(data))
         pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
         target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
         preds_all += [pred]
         targets_all += [target]
+    
+    if encoder_scheduler is not None and scheduler_step_time=='epoch':
+        encoder_scheduler.step()
+        decoder_scheduler.step()
     preds_all = np.concatenate(preds_all)
     targets_all = np.concatenate(targets_all)
     score = rmse(targets_all, preds_all)
@@ -296,19 +303,33 @@ def main():
         encoder = Encoder(cfg.input_size, cfg.hidden_size).to(device)
         decoder = Decoder(cfg.hidden_size, cfg.output_size).to(device)
 
-        loss_fn = nn.MSELoss()
+        if cfg.loss_fn == 'MSELoss':
+            loss_fn = nn.MSELoss()
+        else:
+            loss_fn = nn.MSELoss()
+        
+        if cfg.optimizer == 'AdamW':
+            encoder_optimizer = torch.optim.AdamW(
+                encoder.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+            decoder_optimizer = torch.optim.AdamW(
+                decoder.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    
+        if cfg.scheduler == 'OneCycleLR':
+            encoder_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                encoder_optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+            decoder_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                decoder_optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+        else:
+            encoder_scheduler, decoder_scheduler  = None, None
+        scheduler_step_time = cfg.scheduler_step_time
 
-        encoder_optimizer = torch.optim.AdamW(
-            encoder.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-        decoder_optimizer = torch.optim.AdamW(
-            decoder.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
         best_dict = dict(
             score=float('inf'),
             loss=float('inf'),
         )
         for epoch in range(1, cfg.n_epochs+1):
             # 学習
-            train_score, train_loss = train_one_epoch(cfg, epoch, train_loader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer)
+            train_score, train_loss = train_one_epoch(cfg, epoch, train_loader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time)
             # 推論
             valid_score, valid_loss = valid_one_epoch(cfg, epoch, valid_loader, encoder, decoder, loss_fn, device)
 
