@@ -62,18 +62,14 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
 class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info, phase):
         super().__init__()
-        self.st2info = st2info
-        # 1. 入力に使える開始日と終了日(最後の24h以外)以内を切り取る
-        # 2. input: (input_size分の時間 ~23hが最後, all station)、target: (24h, all station)
-        #    stationに対しnullが存在しないデータだけtrain, testのlistに追加
         self.inputs = []
         self.targets = []
         self.stations = []
         self.borders = []
 
         first_index = df.index[0]
-        start_row = 24 # 例えばsequenceの長さが30(時間)の場合、入力に使うのは"2日目の23時までの30時間"にする
-        last_row = len(df) # 最後の行まで使う
+        start_row = 24 # 最低でもはじめの24hは使う
+        last_row = len(df) # 最後の行まで使う (最後の24hは推論用)
 
          # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
         for border in tqdm(range(start_row, last_row, 24)):
@@ -287,7 +283,7 @@ def main():
             wandb.config = OmegaConf.to_container(
                 cfg, resolve=True, throw_on_missing=True)
             wandb.init(project=cfg.wandb_project, entity='luka-magic',
-                        name=f'{exp_path.name}', config=cfg)
+                        name=f'{exp_path.name}', config=wandb.config)
             wandb.config.fold = fold
         train_fold_df = df[df['fold'] < fold]
         valid_fold_df = df[df['fold'] == fold]

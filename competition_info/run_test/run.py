@@ -154,7 +154,7 @@ def main():
         return None
     
     result = pd.merge(predictions, out_all_data, on=('date', 'hour', 'station'))
-
+    
     # compute RMSE
     print('\nRMSE:', np.sqrt(((result['value_x']-result['value_y'])**2).mean()))
 

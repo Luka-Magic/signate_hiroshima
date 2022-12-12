@@ -9,14 +9,12 @@ from hydra.experimental import compose, initialize_config_dir
 
 
 def preprocess(cfg, df):
-    # string -> floatに (欠損値を全てnanとする)
+    # string -> floatに (strの欠損値を全てnanとする)
     df = df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
 
-    # 数値部分(date, hour以外)をnan埋め
+    # 標準化
     df_meta = df[['date', 'hour']]
     df_data = df.drop(columns=['date', 'hour'])
-
-    # 標準化
     df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)
     df = pd.concat([df_meta, df_zscore_data], axis=1)
     
@@ -154,13 +152,7 @@ def postprocess(preds_all, stations):
 class ScoringService(object):
     @classmethod
     def get_model(cls, model_path):
-        """
-        Get model method
-        Args:
-            model_path (str): Path to the trained model directory.
-        Returns:
-            bool: The return value. True for success, False otherwise.
-        """
+        
         cls.water_df = None
         cls.rain_df = None
         cls.tide_df = None
@@ -179,12 +171,6 @@ class ScoringService(object):
 
     @classmethod
     def predict(cls, input):
-        """Predict method
-        Args:
-            input (str): path to the image you want to make inference from
-        Returns:
-            dict: Inference for the given input.
-        """
 
         cfg = cls.cfg
 
@@ -200,7 +186,7 @@ class ScoringService(object):
         # 前処理
         input_columns = list(input['stations']) + ['date', 'hour']
         input_df = cls.water_df.loc[:, input_columns]
-        input_df, st2info = preprocess(cfg, input_df) # df: date, hour, station_1, ..., station_n 
+        input_df, st2info = preprocess(cfg, input_df)
 
         # dataloaderの用意
         test_ds = HiroshimaDataset(cfg, input_df, st2info)
