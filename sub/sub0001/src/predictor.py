@@ -175,6 +175,7 @@ class ScoringService(object):
 
         # input -> stationがcolumnの、長さ24(時間分)のdataframe
         waterlevel_series = input2seriesdf(input)
+        stations = list(input['station'])
         
         # 過去のdfと結合
         if cls.water_df is None:
@@ -183,7 +184,7 @@ class ScoringService(object):
             cls.water_df = pd.concat([cls.water_df, waterlevel_series]).reset_index(drop=True)
         
         # 前処理
-        input_columns = list(input['stations']) + ['date', 'hour']
+        input_columns = stations + ['date', 'hour']
         input_df = cls.water_df.loc[:, input_columns]
         input_df, st2info = preprocess(cfg, input_df)
 
@@ -191,7 +192,7 @@ class ScoringService(object):
         test_ds = HiroshimaDataset(cfg, input_df, st2info)
         test_loader = DataLoader(
             test_ds,
-            batch_size=cfg.valid_bs,
+            batch_size=cfg.test_bs,
             shuffle=False,
             num_workers=cfg.n_workers,
             pin_memory=True
@@ -216,13 +217,10 @@ class ScoringService(object):
 
                     preds = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
                     preds_one_model.append(preds)
-                
-                # if i == 0:
-                #     stations += meta['station']
             
             preds_one_model = np.concatenate(preds_one_model)
             preds_all.append(preds_one_model)
         
         preds_all = ensemble(preds_all)
-        output = postprocess(preds_all, input_df.drop(columns=['date', 'hour']).columns)
+        output = postprocess(preds_all, stations)
         return output
