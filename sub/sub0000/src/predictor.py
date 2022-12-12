@@ -28,6 +28,8 @@ class ScoringService(object):
         """
         stations = input['stations']
         waterlevel = input['waterlevel']
+        print(pd.DataFrame(stations, columns=['station']))
+        print(pd.DataFrame(stations, columns=['station']).columns)
         print(pd.DataFrame(waterlevel))
         print(pd.DataFrame(waterlevel).columns)
         merged = pd.merge(pd.DataFrame(stations, columns=['station']), pd.DataFrame(waterlevel))
