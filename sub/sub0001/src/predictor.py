@@ -152,8 +152,6 @@ def postprocess(preds_all, stations):
     df = df.fillna(df.mean())
 
     df = df.stack().reset_index().rename(columns={0: 'value'})
-    print(df)
-    print(df.columns)
     df['hour'] = df['hour'].astype(int)    
     df['station'] = df['station'].astype(str)    
     df['value'] = df['value'].astype(float)
