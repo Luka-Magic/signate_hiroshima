@@ -140,22 +140,37 @@ def ensemble(preds_all):
     preds_all = np.mean(preds_all, axis=0)
     return preds_all
 
-def postprocess(preds_all, stations):
-    df = pd.DataFrame(preds_all.T, columns=stations).astype(float)
-    assert len(df) == 24, 'dataframeの高さが24時間になってない。'
-    df.index.name = 'hour'
-    df.columns.name = 'station'
+# def postprocess(preds_all, stations):
+#     df = pd.DataFrame(preds_all.T, columns=stations).astype(float)
+#     assert len(df) == 24, 'dataframeの高さが24時間になってない。'
+#     df.index.name = 'hour'
+#     df.columns.name = 'station'
 
+#     # formatを整える & nan埋め
+#     df = df.fillna(method='ffill')
+#     df = df.fillna(method='bfill') 
+#     df = df.fillna(df.mean())
+
+#     df = df.stack().reset_index().rename(columns={0: 'value'})
+#     df['hour'] = df['hour'].astype(int)    
+#     df['station'] = df['station'].astype(str)    
+#     df['value'] = df['value'].astype(float)
+#     output = df.to_dict('records')
+#     return output
+
+def postprocess(preds_all, output_df):
+    value = preds_all.reshape(-1)
+    output_df['value'] = value
+    
     # formatを整える & nan埋め
     df = df.fillna(method='ffill')
     df = df.fillna(method='bfill') 
     df = df.fillna(df.mean())
 
-    df = df.stack().reset_index().rename(columns={0: 'value'})
     df['hour'] = df['hour'].astype(int)    
     df['station'] = df['station'].astype(str)    
     df['value'] = df['value'].astype(float)
-    output = df.to_dict('records')
+    output = df[['hour', 'station', 'value']].to_dict('records')
     return output
 
 class ScoringService(object):
@@ -186,6 +201,8 @@ class ScoringService(object):
         # input -> stationがcolumnの、長さ24(時間分)のdataframe
         waterlevel_series = input2seriesdf(input)
         stations = list(input['stations'])
+        waterlevel = input['waterlevel']
+        output_df = pd.merge(pd.DataFrame(stations, columns=['station']), pd.DataFrame(waterlevel))
         
         # 過去のdfと結合
         if cls.water_df is None:
@@ -232,5 +249,5 @@ class ScoringService(object):
             preds_all.append(preds_one_model)
         
         preds_all = ensemble(preds_all)
-        output = postprocess(preds_all, stations)
+        output = postprocess(preds_all, output_df)
         return output
