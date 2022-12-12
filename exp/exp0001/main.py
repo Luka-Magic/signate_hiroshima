@@ -323,6 +323,7 @@ def main():
             score=float('inf'),
             loss=float('inf'),
         )
+        
         for epoch in range(1, cfg.n_epochs+1):
             # 学習
             train_score, train_loss = train_one_epoch(cfg, epoch, train_loader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time)
