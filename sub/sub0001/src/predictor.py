@@ -156,8 +156,7 @@ def postprocess(preds_all, stations):
     print(df.columns)
     df['hour'] = df['hour'].astype(int)    
     df['station'] = df['station'].astype(str)    
-    df['value'] = df['value'].astype(float)    
-    aaa
+    df['value'] = df['value'].astype(float)
     output = df.to_dict('records')
     return output
 
