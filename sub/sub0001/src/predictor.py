@@ -175,7 +175,7 @@ class ScoringService(object):
 
         # input -> stationがcolumnの、長さ24(時間分)のdataframe
         waterlevel_series = input2seriesdf(input)
-        stations = list(input['station'])
+        stations = list(input['stations'])
         
         # 過去のdfと結合
         if cls.water_df is None:
