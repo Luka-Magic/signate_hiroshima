@@ -62,6 +62,8 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
 class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info, phase):
         super().__init__()
+        self.st2info = st2info
+        
         self.inputs = []
         self.targets = []
         self.stations = []
