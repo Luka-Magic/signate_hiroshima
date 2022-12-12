@@ -29,7 +29,8 @@ class ScoringService(object):
         stations = input['stations']
         waterlevel = input['waterlevel']
         merged = pd.merge(pd.DataFrame(stations, columns=['station']), pd.DataFrame(waterlevel))
-        display(merged)
+        print(merged)
+        print(merged.columns)
         return
         merged['value'] = merged['value'].replace({'M':0.0, '*':0.0, '-':0.0, '--': 0.0, '**':0.0})
         merged['value'] = merged['value'].fillna(0.0)
