@@ -140,9 +140,9 @@ def ensemble(preds_all):
     preds_all = np.mean(preds_all, axis=0)
     return preds_all
 
-
 def postprocess(preds_all, stations):
     df = pd.DataFrame(preds_all.T, columns=stations)
+    assert len(df) == 24, 'dataframeの高さが24時間になってない。'
     df.index.name = 'hour'
     df.columns.name = 'station'
     output = df.stack().reset_index().rename(columns={0: 'value'}).to_dict('records')
