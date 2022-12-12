@@ -147,13 +147,15 @@ def postprocess(preds_all, stations):
     df.columns.name = 'station'
 
     # formatを整える & nan埋め
-    df['hour'] = df['hour'].astype(int)
-    df['station'] = df['station'].astype(str)
     df = df.fillna(method='ffill')
     df = df.fillna(method='bfill') 
     df = df.fillna(df.mean())
 
-    output = df.stack().reset_index().rename(columns={0: 'value'}).to_dict('records')
+    df = df.stack().reset_index().rename(columns={0: 'value'})
+    print(df)
+    print(df.columns)
+    aaa
+    output = df.to_dict('records')
     return output
 
 class ScoringService(object):
