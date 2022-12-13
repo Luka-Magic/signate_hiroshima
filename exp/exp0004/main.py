@@ -122,9 +122,9 @@ class Encoder(nn.Module):
         input_size = cfg.input_size
         hidden_size = cfg.hidden_size
         dropout = cfg.dropout
-        bilstm = cfg.bilstm
+        bidirectional = cfg.bidirectional
         self.lstm = nn.LSTM(input_size, hidden_size, \
-            dropout=dropout, batch_first=True, bilstm=bilstm)
+            dropout=dropout, batch_first=True, bidirectional=bidirectional)
     
     def forward(self, x, h0=None):
         '''
@@ -141,13 +141,13 @@ class Decoder(nn.Module):
         hidden_size = cfg.hidden_size
         output_size = cfg.output_size
         dropout = cfg.dropout
-        bilstm = cfg.bilstm
-        if bilstm:
+        bidirectional = cfg.bidirectional
+        if bidirectional:
             self.lstm = nn.LSTM(hidden_size*2, hidden_size, \
-                dropout=dropout, batch_first=True, bilstm=bilstm)
+                dropout=dropout, batch_first=True, bidirectional=bidirectional)
         else:
             self.lstm = nn.LSTM(hidden_size, hidden_size, \
-                dropout=dropout, batch_first=True, bilstm=bilstm)
+                dropout=dropout, batch_first=True, bidirectional=bidirectional)
         self.fc = nn.Linear(hidden_size, output_size)
     
     def forward(self, x, h):
@@ -201,7 +201,7 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
         target = target.to(device).float() # (bs, len_of_series)
 
         h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size)
-        if cfg.bilstm:
+        if cfg.bidirectional:
             h = h.view(1, -1, cfg.hidden_size*2)
             c = c.view(1, -1, cfg.hidden_size*2)
         repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
@@ -254,6 +254,9 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
 
         with torch.no_grad():
             h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
+            if cfg.bidirectional:
+                h = h.view(1, -1, cfg.hidden_size*2)
+                c = c.view(1, -1, cfg.hidden_size*2)
             repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
             pred = decoder(repeat_input, (h, c)).squeeze() # pred: (bs, len_of_series, output_size)
 

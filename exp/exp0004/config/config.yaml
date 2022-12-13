@@ -14,7 +14,7 @@ output_size: 1
 input_sequence_size: 30
 output_sequence_size: 24
 dropout: 0.1
-bilstm: True
+bidirectional: True
 
 ######   DATA LOADER   #######################
 train_bs: 512
