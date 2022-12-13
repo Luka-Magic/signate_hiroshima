@@ -336,8 +336,8 @@ def main():
                 valid_score=valid_score, valid_loss=valid_loss
             )
             if valid_score < best_dict['score']:
-                wandb.run.summary['best_score'] = best_dict['score']
                 best_dict['score'] = valid_score
+                wandb.run.summary['best_score'] = best_dict['score']
                 save_dict = {
                     'epoch': epoch,
                     'encoder': encoder.state_dict(),
