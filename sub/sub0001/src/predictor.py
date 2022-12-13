@@ -164,7 +164,7 @@ def postprocess(preds_all, df):
     
     # formatを整える & nan埋め
     df = df.fillna(method='ffill')
-    df = df.fillna(method='bfill') 
+    df = df.fillna(method='bfill')
     df = df.fillna(df.mean())
 
     df['hour'] = df['hour'].astype(int)    

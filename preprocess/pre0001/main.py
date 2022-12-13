@@ -26,20 +26,20 @@
 from pathlib import Path
 import pandas as pd
 
-from .process.water_process1 import water_preprocess1
-from .process.rain_process1 import rain_preprocess1
-from .process.tide_process1 import tide_preprocess1
-from .process.to_timeseries import to_timeseries
+from .process.water import water_preprocess1
+from .process.rain import rain_preprocess1
+from .process.tide import tide_preprocess1
+from .process.timeseries import convert_timeseries
 from .process.river_process import river_preprocess1
 
 def main(data_dir: Path):
     # 1. データを読み込む
-    rain = pd.read_csv(data_dir / 'rainfall' / 'data.csv'),
-    rain_st = pd.read_csv(data_dir / 'rainfall' / 'stations.csv'),
-    tide = pd.read_csv(data_dir / 'tidelevel' / 'data.csv'),
-    tide_st = pd.read_csv(data_dir / 'tidelevel' / 'stations.csv'),
-    water = pd.read_csv(data_dir / 'waterlevel' / 'data.csv'),
-    water_st = pd.read_csv(data_dir / 'waterlevel' / 'stations.csv'),
+    rain = pd.read_csv(data_dir / 'rainfall' / 'data.csv')
+    rain_st = pd.read_csv(data_dir / 'rainfall' / 'stations.csv')
+    tide = pd.read_csv(data_dir / 'tidelevel' / 'data.csv')
+    tide_st = pd.read_csv(data_dir / 'tidelevel' / 'stations.csv')
+    water = pd.read_csv(data_dir / 'waterlevel' / 'data.csv')
+    water_st = pd.read_csv(data_dir / 'waterlevel' / 'stations.csv')
     dam = pd.read_csv(data_dir / 'dam.csv')
 
     # 2. 3つのデータに対し前処理 & database化
@@ -48,9 +48,9 @@ def main(data_dir: Path):
     water = water_preprocess1(water, water_st)
 
     # 3. 1つのstationに対し値を一列に時系列で並べる
-    rain = to_timeseries(rain, 'rain')
-    tide = to_timeseries(tide, 'tide')
-    water = to_timeseries(water, 'water')
+    rain = convert_timeseries(rain)
+    tide = convert_timeseries(tide)
+    water = convert_timeseries(water)
 
     # 4. 河川名、水系名について処理
     (rain, rain_st, tide, tide_st, water, water_st, dam, river, system) = \

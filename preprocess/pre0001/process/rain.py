@@ -3,7 +3,7 @@ import numpy as np
 import gc
 import math
 
-def water_process1(rain, rain_st):
+def rain_process1(rain, rain_st):
     ###################
     # data.csv側の処理 #
     ###################
@@ -21,7 +21,8 @@ def water_process1(rain, rain_st):
     dup_date_st_city_idx =  dup_date_st_city.index
     # 重複した行それぞれに含まれる値でfloatである値をカウント
     dup_date_st_city_df = rain.set_index(['date', 'station', 'city']).loc[dup_date_st_city_idx]
-    dup_date_st_city_df['num_count'] = dup_date_st_city_df.apply(lambda x: 24 - pd.to_numeric(x, errors='coerce').isnull().sum(),axis=1)
+    dup_date_st_city_df['num_count'] = dup_date_st_city_df.apply(lambda x: \
+        24 - pd.to_numeric(x, errors='coerce').isnull().sum(),axis=1)
     # floatが最も多い1行だけをとり出してconcat
     concat_df = None
     for _, df in dup_date_st_city_df.groupby(['date', 'station', 'city']):
@@ -41,6 +42,9 @@ def water_process1(rain, rain_st):
     del nunique_date_st_city, dup_date_st_city, dup_date_st_city_df, \
         unique_date_st_city, unique_date_st_city_df, concat_df, df
     gc.collect()
+
+    rain.reset_index(inplace=True)
+    rain.sort_values(['date', 'station', 'city'], inplace=True)
 
     ##### (おそらく)同じstationである行の値をマージ
     # 観測日数が31日のstationは、そのstation名に(電)のついたものと同じstationと考えられるのでマージ
@@ -65,22 +69,17 @@ def water_process1(rain, rain_st):
     ######################
 
     ##### station名に(砂防)が含まれているものは入力時使用も0であり、ないものとマージできる
-    rain_st['観測所名称'] = rain_st['観測所名称'].str.replace(r'\(砂防\)', '')
-
+    rain_st.loc[:, '観測所名称'] = rain_st['観測所名称'].str.replace(r'\(砂防\)', '')
 
     ###################
     # データベースを作成 #
     ###################
-
+    
     # idに(station, city)を対応させたテーブルを作る
     keys = rain.groupby(['station', 'city']).count().index
     rain_db = pd.DataFrame(index=keys).reset_index()
-    rain_db['id'] = range(len(rain_db))    
+    rain_db['id'] = range(len(rain_db))
     rain_db = rain_db.reindex(columns=['id', 'station', 'city'])
-
-    # data.csvの(station, city)をidに置き換える
-    rain = rain_db.merge(rain, on=['station', 'city'], how='left')
-    rain.drop(['station', 'city'], axis=1, inplace=True)
 
     # column名に変更を加える
     rain_st = rain_st.rename(columns={'観測所名称': 'station', '市町': 'city'})
@@ -93,6 +92,10 @@ def water_process1(rain, rain_st):
             city = rain.query('station==@st')['city'].unique()[0] # data.csvからそのstationを検索してなんのcityかをみる
             rain_st.loc[(rain_st['station'] == st), 'city'] = city
     
+    # data.csvの(station, city)をidに置き換える
+    rain = rain_db.merge(rain, on=['station', 'city'], how='left')
+    rain.drop(['station', 'city'], axis=1, inplace=True)
+
     rain_st = rain_db.merge(rain_st, on=['station', 'city'], how='left')
     rain_st['入力時使用'] = rain_st['入力時使用'].fillna(0.0)
 
