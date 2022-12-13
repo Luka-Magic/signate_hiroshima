@@ -203,7 +203,8 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
 
         h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
         if cfg.bidirectional:
-            repeat_input = h.view(1, -1, cfg.hidden_size*2).transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
+            onedir_h = h.permute(1, 0, 2).contiguous().view(1, -1, cfg.hidden_size*2)
+            repeat_input = onedir_h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size) # repeat_input: (bs, len_of_series, hidden_size)
         pred = decoder(repeat_input, (h, c)).squeeze() # pred: (bs, len_of_series, output_size)
 
         loss = 0
@@ -254,7 +255,8 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
         with torch.no_grad():
             h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
             if cfg.bidirectional:
-                repeat_input = h.view(1, -1, cfg.hidden_size*2).transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
+                onedir_h = h.permute(1, 0, 2).contiguous().view(1, -1, cfg.hidden_size*2)
+                repeat_input = onedir_h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
             pred = decoder(repeat_input, (h, c)).squeeze() # pred: (bs, len_of_series, output_size)
 
             # 評価用のlossの算出
