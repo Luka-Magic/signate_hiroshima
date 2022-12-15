@@ -1,5 +1,6 @@
 from pathlib import Path
 import gc
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -37,7 +38,7 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
     valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
     valid_fold_df = valid_fold_df.drop(columns=['75', '152'])
 
-    # train_fold_dfの数値部分(date, hour以外)をnan埋め
+    # train_fold_dfの数値部分(date, hour以外)の処理
     train_meta = train_fold_df[['date', 'hour']]
     train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
 
@@ -57,6 +58,28 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
     st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
 
     return train_fold_df, valid_fold_df, st2info
+
+
+def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
+    train_ds = HiroshimaDataset(cfg, train_fold_df, st2info, 'train')
+    valid_ds = HiroshimaDataset(cfg, valid_fold_df, st2info, 'valid')
+    
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.train_bs,
+        shuffle=True,
+        num_workers=cfg.n_workers,
+        pin_memory=True
+    )
+
+    valid_loader = DataLoader(
+        valid_ds,
+        batch_size=cfg.valid_bs,
+        shuffle=False,
+        num_workers=cfg.n_workers,
+        pin_memory=True
+    )
+    return train_loader, valid_loader
 
 
 class HiroshimaDataset(Dataset):
@@ -145,27 +168,6 @@ class Decoder(nn.Module):
         x = self.fc(x) # -> x: (bs, len_of_series, output_size)
         return x, h
 
-def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
-    train_ds = HiroshimaDataset(cfg, train_fold_df, st2info, 'train')
-    valid_ds = HiroshimaDataset(cfg, valid_fold_df, st2info, 'valid')
-    
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg.train_bs,
-        shuffle=True,
-        num_workers=cfg.n_workers,
-        pin_memory=True
-    )
-
-    valid_loader = DataLoader(
-        valid_ds,
-        batch_size=cfg.valid_bs,
-        shuffle=False,
-        num_workers=cfg.n_workers,
-        pin_memory=True
-    )
-    return train_loader, valid_loader
-
 
 def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time):
     def get_lr(optimizer):
@@ -186,23 +188,37 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
 
-        encoder_state = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
-        decoder_input = torch.cat([data[:, -1:, :], target], axis=1)[:, :-1, :]
-        pred = decoder(decoder_input, encoder_state).squeeze() # decoder_output: (bs, len_of_series,)
+        encoder_output, encoder_state = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
+        decoder_input = encoder_output[:, -1:, :]
+        decoder_state = encoder_state
 
+        pred = torch.empty(len(data), cfg.output_sequence_size, cfg.output_size).to(device).float()
+
+        for i in range(cfg.output_sequence_size):
+            decoder_output, decoder_state = decoder(decoder_input, decoder_state) # decoder_output: (bs, 1, output_size=1)
+            pred[:, i:i+1, :] = decoder_output
+            
+            teacher_force = random.random() < cfg.teacher_forcing_ratio
+            decoder_input = target[:, i:i+1].unsqueeze(-1) if teacher_force else decoder_output
+        
+        pred = pred.squeeze()
+
+        # 評価用のlossの算出
         loss = 0
         for i in range(pred.size()[1]):
-            loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目を0としている
+            loss += loss_fn(pred[:, i], target[:, i])
+        losses.update(loss.item(), len(data))
         
         encoder_optimizer.zero_grad()
         decoder_optimizer.zero_grad()
         loss.backward()
         encoder_optimizer.step()
         decoder_optimizer.step()
+
         if encoder_scheduler is not None and scheduler_step_time=='step':
             encoder_scheduler.step()
             decoder_scheduler.step()
-
+        
         losses.update(loss.item(), len(data))
         pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
         target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
@@ -236,10 +252,17 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
         target = target.to(device).float() # (bs, len_of_series)
 
         with torch.no_grad():
-            encoder_state = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
+            encoder_output, encoder_state = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size)
+            decoder_input = encoder_output[:, -1:, :]
+            decoder_state = encoder_state
 
-            # for i in range(cfg.input_sequence_size):
-            #     decoder_output, decoder_hidden = 
+            pred = torch.empty(len(data), cfg.output_sequence_size, cfg.output_size).to(device).float()
+
+            for i in range(cfg.output_sequence_size):
+                decoder_output, decoder_state = decoder(decoder_input, decoder_state) # decoder_output: (bs, 1, output_size=1)
+                decoder_input = decoder_output
+                pred[:, i:i+1, :] = decoder_output
+            pred = pred.squeeze()
 
             # 評価用のlossの算出
             loss = 0
