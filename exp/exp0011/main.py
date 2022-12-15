@@ -140,17 +140,19 @@ class HiroshimaDataset(Dataset):
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
     
     def forward(self, x, h0=None):
         '''
             x: (bs, len_of_series ,input_size)
             h0 = Tuple(h, c)
         '''
-        _, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
-        return h
+        x, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
+        x = self.fc(x) # -> x: (bs, len_of_series, output_size)
+        return x, h
 
 
 class Decoder(nn.Module):
@@ -159,12 +161,12 @@ class Decoder(nn.Module):
         self.lstm = nn.LSTM(output_size, hidden_size, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
     
-    def forward(self, x, h):
+    def forward(self, x, h0=None):
         '''
-            x: (bs, len_of_series ,hidden_size)
+            x: (bs, len_of_series ,output_size)
             h = Tuple(h, c)
         '''
-        x, h = self.lstm(x, h) # -> x: (bs, len_of_series, hidden_size)
+        x, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
         x = self.fc(x) # -> x: (bs, len_of_series, output_size)
         return x, h
 
