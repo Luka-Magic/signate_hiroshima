@@ -1,0 +1,46 @@
+######   BASIC   #############################
+use_wandb: True
+wandb_project: signate_hiroshima
+water_csv_path: data/timeseries/water.csv
+device: cuda
+seed: 77
+save_model: True
+
+######   MODEL   #############################
+model: LSTM
+input_size: 1
+hidden_size: 128
+output_size: 1
+input_sequence_size: 30
+output_sequence_size: 24
+teacher_forcing_ratio: 0.5
+
+######   DATA LOADER   #######################
+train_bs: 512
+valid_bs: 512
+test_bs: 512
+n_workers: 2
+
+######   TRAIN   #############################
+# basic
+n_folds: 3
+use_folds: [0, 1, 2]
+n_epochs: 100
+
+# Loss
+loss_fn: MSELoss
+
+# optimizer
+optimizer: AdamW
+lr: 1e-3
+weight_decay: 1e-6
+
+# scheduler
+scheduler: OneCycleLR
+scheduler_step_time: step
+T_0: ${n_epochs} # CAWR
+T_mult: 1 # CAWR
+eta_min: 1e-9 # CAWR
+pct_start: 0.1 # OCLR
+div_factor: 25. # OCLR
+final_div_factor: 1000. # OCLR
