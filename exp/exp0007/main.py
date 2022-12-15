@@ -270,6 +270,9 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
             losses.update(loss.item(), len(data))
 
             # 評価用にRMSEを算出
+            pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            
             input_last_value = meta['input_last_value'].unsqueeze(-1).numpy()
             pred = np.cumsum(pred, axis=1) + input_last_value
             target = np.cumsum(target, axis=1) + input_last_value
