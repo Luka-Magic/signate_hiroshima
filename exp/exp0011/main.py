@@ -117,13 +117,9 @@ class HiroshimaDataset(Dataset):
 
 
 class Encoder(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, input_size, hidden_size):
         super().__init__()
-        input_size = cfg.input_size
-        hidden_size = cfg.hidden_size
-        dropout = cfg.dropout
-        self.lstm = nn.LSTM(input_size, hidden_size, \
-            dropout=dropout, batch_first=True)
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
     
     def forward(self, x, h0=None):
         '''
@@ -135,13 +131,9 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, hidden_size, output_size):
         super().__init__()
-        hidden_size = cfg.hidden_size
-        output_size = cfg.output_size
-        dropout = cfg.dropout
-        self.lstm = nn.LSTM(hidden_size, hidden_size, \
-            dropout=dropout, batch_first=True)
+        self.lstm = nn.LSTM(output_size, hidden_size, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
     
     def forward(self, x, h):
@@ -151,7 +143,7 @@ class Decoder(nn.Module):
         '''
         x, h = self.lstm(x, h) # -> x: (bs, len_of_series, hidden_size)
         x = self.fc(x) # -> x: (bs, len_of_series, output_size)
-        return x
+        return x, h
 
 def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
     train_ds = HiroshimaDataset(cfg, train_fold_df, st2info, 'train')
@@ -194,9 +186,9 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
 
-        h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
-        repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
-        pred = decoder(repeat_input, (h, c)).squeeze() # decoder_output: (bs, len_of_series,)
+        encoder_state = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
+        decoder_input = torch.cat([data[:, -1:, :], target], axis=1)[:, :-1, :]
+        pred = decoder(decoder_input, encoder_state).squeeze() # decoder_output: (bs, len_of_series,)
 
         loss = 0
         for i in range(pred.size()[1]):
@@ -244,9 +236,10 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
         target = target.to(device).float() # (bs, len_of_series)
 
         with torch.no_grad():
-            h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
-            repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
-            pred = decoder(repeat_input, (h, c)).squeeze() # pred: (bs, len_of_series, output_size)
+            encoder_state = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
+
+            # for i in range(cfg.input_sequence_size):
+            #     decoder_output, decoder_hidden = 
 
             # 評価用のlossの算出
             loss = 0
@@ -304,8 +297,8 @@ def main():
 
         device = torch.device(cfg.device)
 
-        encoder = Encoder(cfg).to(device)
-        decoder = Decoder(cfg).to(device)
+        encoder = Encoder(cfg.input_size, cfg.hidden_size).to(device)
+        decoder = Decoder(cfg.hidden_size, cfg.output_size).to(device)
 
         if cfg.loss_fn == 'MSELoss':
             loss_fn = nn.MSELoss()

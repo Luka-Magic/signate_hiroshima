@@ -13,7 +13,6 @@ hidden_size: 128
 output_size: 1
 input_sequence_size: 30
 output_sequence_size: 24
-dropout: 0.5
 
 ######   DATA LOADER   #######################
 train_bs: 512
