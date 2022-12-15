@@ -3,6 +3,7 @@ import pandas as pd
 def convert_timeseries(df):
     all_id = df['id'].unique()
     all_date = df['date'].unique().astype(int)
+    n_ids = len(all_id)
     all_id.sort()
     all_date.sort()
     null_value = 'x'
@@ -21,7 +22,7 @@ def convert_timeseries(df):
     new_df = new_df.sort_values(['id', 'date']).reset_index(drop=True)
     del old_df
     
-    series = new_df.iloc[:, 2:].values.reshape(472, -1).T
+    series = new_df.iloc[:, 2:].values.reshape(n_ids, -1).T
     timeseries_df = pd.DataFrame(series, columns=all_id)
 
     dates = []

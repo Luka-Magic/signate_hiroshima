@@ -3,6 +3,11 @@ import numpy as np
 import gc
 import math
 
+import pandas as pd
+import numpy as np
+import gc
+import math
+
 def rain_process1(rain, rain_st):
     ###################
     # data.csv側の処理 #

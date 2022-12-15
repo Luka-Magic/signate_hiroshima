@@ -14,6 +14,8 @@ def water_process1(water, water_st):
     
     water.loc[water['station'] == '山手', 'station'] = '山手(国)'
 
+    water_st.loc[:, '河川名'] = water_st['河川名'].str.replace('\\n', '')
+    
     keys = water.groupby(['station', 'river']).count().index
     water_db = pd.DataFrame(index=keys).reset_index()
     water_db['id'] = range(len(water_db))
@@ -21,8 +23,10 @@ def water_process1(water, water_st):
 
     water = water_db.merge(water, on=['station', 'river'], how='left')
     water.drop(['station', 'river'], axis=1, inplace=True)
-
+    
     water_st = water_st.rename(columns={'観測所名称': 'station', '河川名': 'river'})
     water_st = water_db.merge(water_st, on=['station', 'river'], how='left')
+
+    water_st.loc[water_st['river']=='太田川放水路', 'river'] = '太田川\\n放水路' # 改行があるとうまく処理されなかったので最後に改行を付け直す
 
     return water, water_st
