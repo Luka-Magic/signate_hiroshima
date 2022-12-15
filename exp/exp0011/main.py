@@ -322,7 +322,7 @@ def main():
 
         device = torch.device(cfg.device)
 
-        encoder = Encoder(cfg.input_size, cfg.hidden_size).to(device)
+        encoder = Encoder(cfg.input_size, cfg.hidden_size, cfg.output_size).to(device)
         decoder = Decoder(cfg.hidden_size, cfg.output_size).to(device)
 
         if cfg.loss_fn == 'MSELoss':
