@@ -58,7 +58,6 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
 
     return train_fold_df, valid_fold_df, st2info
 
-
 class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info, phase):
         super().__init__()
@@ -75,7 +74,7 @@ class HiroshimaDataset(Dataset):
 
          # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
         if phase == 'train':
-            border_interval = 24
+            border_interval = 8
         else:
             border_interval = 24
         for border in tqdm(range(start_row, last_row, border_interval)):
