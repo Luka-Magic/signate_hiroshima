@@ -73,7 +73,7 @@ class HiroshimaDataset(Dataset):
         start_row = 24 # 最低でもはじめの24hは使う
         last_row = len(df) # 最後の行まで使う (最後の24hは推論用)
 
-         # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
+        # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
         for border in tqdm(range(start_row, last_row, 24)):
             assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
             
