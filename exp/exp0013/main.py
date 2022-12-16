@@ -96,7 +96,8 @@ class HiroshimaDataset(Dataset):
                 pad_length = cfg.input_sequence_size - input_.shape[1]
                 pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
                 input_ = np.concatenate([pad, input_], axis=1)
-            
+            if len(target) != cfg.output_sequence_size:
+                continue
             self.inputs += input_.tolist()
             self.targets += target.values.T.tolist()
         print(f'{phase} datas: {len(self.inputs)}')
@@ -113,7 +114,7 @@ class HiroshimaDataset(Dataset):
 
         input_ = torch.tensor(input_) # input_: (len_of_series, input_size)
         target = torch.tensor(target) # target: (len_of_series)
-        print(input_.shape, target.shape)
+        # print(input_.shape, target.shape)
 
         return input_, target, meta
 
