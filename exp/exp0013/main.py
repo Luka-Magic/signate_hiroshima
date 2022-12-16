@@ -79,7 +79,7 @@ class HiroshimaDataset(Dataset):
         else:
             border_interval = 24
         for border in tqdm(range(start_row, last_row, border_interval)):
-            if random.random() < cfg.train_data_ratio:
+            if phase == 'train' and random.random() < cfg.train_data_ratio:
                 continue
             input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
             input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
