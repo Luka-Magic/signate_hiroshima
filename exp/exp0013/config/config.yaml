@@ -24,7 +24,8 @@ n_workers: 2
 # basic
 n_folds: 3
 use_folds: [0, 1, 2]
-n_epochs: 30
+n_epochs: 15
+num_valids_per_epoch: 10
 
 # Loss
 loss_fn: MSELoss

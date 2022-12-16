@@ -170,60 +170,7 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
     return train_loader, valid_loader
 
 
-def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time):
-    def get_lr(optimizer):
-        for param_group in optimizer.param_groups:
-            return param_group['lr']
-    
-    encoder.train()
-    decoder.train()
-
-    preds_all = []
-    targets_all = []
-
-    losses = AverageMeter()
-
-    pbar = tqdm(enumerate(dataloader), total=len(dataloader))
-
-    for step, (data, target, meta) in pbar:
-        data = data.to(device).float() # (bs, len_of_series, input_size)
-        target = target.to(device).float() # (bs, len_of_series)
-
-        h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
-        repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
-        pred = decoder(repeat_input, (h, c)).squeeze() # decoder_output: (bs, len_of_series,)
-
-        loss = 0
-        for i in range(pred.size()[1]):
-            loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目を0としている
-        
-        encoder_optimizer.zero_grad()
-        decoder_optimizer.zero_grad()
-        loss.backward()
-        encoder_optimizer.step()
-        decoder_optimizer.step()
-        if encoder_scheduler is not None and scheduler_step_time=='step':
-            encoder_scheduler.step()
-            decoder_scheduler.step()
-
-        losses.update(loss.item(), len(data))
-        pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        preds_all += [pred]
-        targets_all += [target]
-    
-    if encoder_scheduler is not None and scheduler_step_time=='epoch':
-        encoder_scheduler.step()
-        decoder_scheduler.step()
-    preds_all = np.concatenate(preds_all)
-    targets_all = np.concatenate(targets_all)
-    score = rmse(targets_all, preds_all)
-    
-    print(f'Train - Epoch {epoch}: losses {losses.avg:.4f}, scores: {score}')
-    return score, losses.avg
-
-
-def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
+def valid_function(cfg, fold, epoch, dataloader, encoder, decoder, loss_fn, device, wandb_dict, best_dict, save_path):
     encoder.eval()
     decoder.eval()
 
@@ -232,7 +179,8 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
 
     losses = AverageMeter()
 
-    pbar = tqdm(enumerate(dataloader), total=len(dataloader))
+    # pbar = tqdm(enumerate(dataloader), total=len(dataloader))
+    pbar = enumerate(dataloader)
 
     for step, (data, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
@@ -257,10 +205,102 @@ def valid_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device):
 
     preds_all = np.concatenate(preds_all)
     targets_all = np.concatenate(targets_all)
-    score = rmse(targets_all, preds_all)
+    valid_score = rmse(targets_all, preds_all)
+    valid_loss = losses.avg
 
-    print(f'Valid - Epoch {epoch}: losses {losses.avg:.4f}, scores {score:.4f}')
-    return score, losses.avg
+    print(f'Valid - Epoch {epoch}: losses {losses.avg:.4f}, scores {valid_score:.4f}')
+
+    # log
+    if valid_score < best_dict['score']:
+        best_dict['score'] = valid_score
+        wandb.run.summary['best_score'] = best_dict['score']
+        save_dict = {
+            'epoch': epoch,
+            'encoder': encoder.state_dict(),
+            'decoder': decoder.state_dict(),
+        }
+        torch.save(save_dict, str(save_path / f'best_score_fold{fold}.pth'))
+        print(f'score update!: {best_dict["score"]:.4f}')
+    if valid_loss < best_dict['loss']:
+        wandb.run.summary['best_loss'] = best_dict['loss']
+        best_dict['loss'] = valid_loss
+    if cfg.use_wandb:
+        wandb.log(wandb_dict)
+    
+    return valid_score, valid_loss
+
+
+def train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder, decoder, loss_fn, device, \
+                        encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time, best_dict, save_path):
+    def get_lr(optimizer):
+        for param_group in optimizer.param_groups:
+            return param_group['lr']
+    
+    encoder.train()
+    decoder.train()
+
+    preds_all = []
+    targets_all = []
+
+    losses = AverageMeter()
+
+    pbar = tqdm(enumerate(train_loader), total=len(train_loader))
+
+    num_valids_per_epoch = len(pbar) // cfg.num_valids_per_epoch # validを行うstep数
+
+    for step, (data, target, meta) in pbar:
+        data = data.to(device).float() # (bs, len_of_series, input_size)
+        target = target.to(device).float() # (bs, len_of_series)
+
+        h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
+        repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
+        pred = decoder(repeat_input, (h, c)).squeeze() # decoder_output: (bs, len_of_series,)
+
+        loss = 0
+        for i in range(pred.size()[1]):
+            loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目を0としている
+        
+        encoder_optimizer.zero_grad()
+        decoder_optimizer.zero_grad()
+        loss.backward()
+        encoder_optimizer.step()
+        decoder_optimizer.step()
+
+        if encoder_scheduler is not None and scheduler_step_time=='step':
+            encoder_scheduler.step()
+            decoder_scheduler.step()
+
+        losses.update(loss.item(), len(data))
+        pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        preds_all += [pred]
+        targets_all += [target]
+        
+        # validとlog、モデルの保存などを行う
+        if step % num_valids_per_epoch == 0:
+            preds_all = np.concatenate(preds_all)
+            targets_all = np.concatenate(targets_all)
+            train_score = rmse(targets_all, preds_all)
+            train_loss = losses.avg
+
+            valid_score, valid_loss = valid_function(cfg, fold, epoch, valid_loader, encoder, decoder, loss_fn, device, wandb_dict, best_dict, save_path)
+            
+            wandb_dict = dict(
+                epoch = (num_valids_per_epoch * (epoch - 1)) + (step // num_valids_per_epoch), # wandbでは1回のvalidを1epochとする
+                train_score = train_score,
+                train_loss = train_loss,
+                valid_score = valid_score,
+                valid_loss = valid_loss
+            )
+
+            if cfg.use_wandb:
+                wandb.log(wandb_dict)
+            encoder.train()
+            decoder.train()
+    
+    if encoder_scheduler is not None and scheduler_step_time=='epoch':
+        encoder_scheduler.step()
+        decoder_scheduler.step()
 
 
 def main():
@@ -328,32 +368,10 @@ def main():
         )
         
         for epoch in range(1, cfg.n_epochs+1):
-            # 学習
-            train_score, train_loss = train_one_epoch(cfg, epoch, train_loader, encoder, decoder, loss_fn, device, encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time)
-            # 推論
-            valid_score, valid_loss = valid_one_epoch(cfg, epoch, valid_loader, encoder, decoder, loss_fn, device)
+            # 学習 & 推論
+            train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder, decoder, loss_fn, device, \
+                        encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time, best_dict, save_path)
 
-            wandb_dict = dict(
-                epoch=epoch,
-                train_score=train_score, train_loss=train_loss,
-                valid_score=valid_score, valid_loss=valid_loss
-            )
-            if valid_score < best_dict['score']:
-                best_dict['score'] = valid_score
-                wandb.run.summary['best_score'] = best_dict['score']
-                save_dict = {
-                    'epoch': epoch,
-                    'encoder': encoder.state_dict(),
-                    'decoder': decoder.state_dict(),
-                }
-                torch.save(save_dict, str(save_path / f'best_score_fold{fold}.pth'))
-                print(f'score update!: {best_dict["score"]:.4f}')
-            if valid_loss < best_dict['loss']:
-                wandb.run.summary['best_loss'] = best_dict['loss']
-                best_dict['loss'] = valid_loss
-            if cfg.use_wandb:
-                wandb.log(wandb_dict)
-        
         wandb.finish()
         del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
         gc.collect()

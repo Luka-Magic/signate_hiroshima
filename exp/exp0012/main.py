@@ -199,10 +199,10 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
         for i in range(cfg.output_sequence_size):
             decoder_output, decoder_state = decoder(decoder_input, decoder_state) # decoder_output: (bs, 1, output_size=1)
             pred[:, i:i+1, :] = decoder_output
-            
+
             teacher_force = random.random() < cfg.teacher_forcing_ratio
             decoder_input = target[:, i:i+1].unsqueeze(-1) if teacher_force else decoder_output
-        
+
         pred = pred.squeeze()
 
         # 評価用のlossの算出
