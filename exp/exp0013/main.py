@@ -374,7 +374,7 @@ def main():
                         encoder_optimizer, decoder_optimizer, encoder_scheduler, decoder_scheduler, scheduler_step_time, best_dict, save_path)
 
         wandb.finish()
-        del encoder, decoder, df, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
+        del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
         gc.collect()
         torch.cuda.empty_cache()
 
