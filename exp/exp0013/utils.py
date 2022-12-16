@@ -1,4 +1,5 @@
 import os
+import random
 import numpy as np
 import torch
 import warnings
@@ -27,6 +28,7 @@ def rmse(label, pred):
     return mean_squared_error(label, pred) ** 0.5
 
 def seed_everything(seed):
+    random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
