@@ -297,6 +297,8 @@ def main():
     
     seed_everything(cfg.seed)
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     if cfg.use_wandb:
         wandb.login()
     
@@ -319,8 +321,6 @@ def main():
 
         train_fold_df, valid_fold_df, st2info = preprocess(cfg, train_fold_df, valid_fold_df)
         train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info)
-
-        device = torch.device(cfg.device)
 
         encoder = Encoder(cfg.input_size, cfg.hidden_size, cfg.output_size).to(device)
         decoder = Decoder(cfg.hidden_size, cfg.output_size).to(device)
