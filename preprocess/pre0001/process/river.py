@@ -17,7 +17,6 @@ def river_process1(rain_st, tide_st,  water_st, dam):
     tide_st = column_rename(tide_st)
     dam = column_rename(dam)
 
-
     riv_sys_db = water_st[['system', 'river']]
     riv_sys_db = pd.concat([riv_sys_db, rain_st[['system', 'river']]])
     riv_sys_db = pd.concat([riv_sys_db, tide_st[['system', 'river']]])

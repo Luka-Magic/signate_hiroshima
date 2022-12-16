@@ -9,12 +9,21 @@ from tide import tide_process1
 from timeseries import convert_timeseries
 from river import river_process1
 
-def main(data_dir: Path):
+def main(data_dir, save_dir):
     '''
+
+        data_dir: str or Path
+            signateからダウンロードできるデータ(train.zip)を解凍したディレクトリ
+            "train"がdata_dirの最後に来るようにする
+        save_dir: str or Path
+            保存先のディレクトリ
+            9つのcsvファイルが出力される
+
+        --------------------------------
 
         前処理の大きな流れ
 
-        1. データを読み込む
+        1. data_dirから計7つのデータを読み込む。
 
         2.  3つのデータ(water, rain, tide)についてそれぞれ,
                 - duplicate
@@ -32,8 +41,17 @@ def main(data_dir: Path):
         4.  河川名と水系名について前処理を施し、河川名、水系名それぞれ
             主キー(id)としたdatabaseを作る。全データの河川名と水系名
             をidで表す。
+        
+        5. save_dirに9つのcsvファイルを保存する。
+
+        --------------------------------
+
 
     '''
+    
+    data_dir = Path(data_dir)
+    save_dir = Path(save_dir)
+    assert data_dir.name == 'train', f'data_dirのディレクトリ名の最後が"train"である必要があります。input: {str(data_dir)}'
 
     # 1. データを読み込む
     rain = pd.read_csv(data_dir / 'rainfall' / 'data.csv')
@@ -55,8 +73,16 @@ def main(data_dir: Path):
     water = convert_timeseries(water)
 
     # 4. 河川名、水系名について処理
-    (rain_st, tide_st, water_st, dam, river, system) = \
+    (rain_st, tide_st, water_st, dam, river_table, river_system_table) = \
         river_process1(rain_st, tide_st, water_st, dam)
 
-    return (rain, rain_st, tide, tide_st, water, water_st, dam, river, system)
-
+    # 5. 保存
+    rain.to_csv(save_dir / 'rainfall' / 'data.csv', index=False)
+    rain_st.to_csv(save_dir / 'rainfall' / 'stations.csv', index=False)
+    tide.to_csv(save_dir / 'tidelevel' / 'data.csv', index=False)
+    tide_st.to_csv(save_dir / 'tidelevel' / 'stations.csv', index=False)
+    water.to_csv(save_dir / 'waterlevel' / 'data.csv', index=False)
+    water_st.to_csv(save_dir / 'waterlevel' / 'stations.csv', index=False)
+    dam.to_csv(save_dir / 'dam.csv', index=False)
+    river_table.to_csv(save_dir / 'river_table.csv', index=False)
+    river_system_table.to_csv(save_dir / 'river_system_table.csv', index=False)

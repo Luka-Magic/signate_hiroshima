@@ -156,7 +156,6 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
         batch_size=cfg.train_bs,
         shuffle=True,
         num_workers=cfg.n_workers,
-        pin_memory=True
     )
 
     valid_loader = DataLoader(
@@ -164,7 +163,6 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
         batch_size=cfg.valid_bs,
         shuffle=False,
         num_workers=cfg.n_workers,
-        pin_memory=True
     )
     return train_loader, valid_loader
 
