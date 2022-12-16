@@ -224,8 +224,6 @@ def valid_function(cfg, fold, epoch, dataloader, encoder, decoder, loss_fn, devi
     if valid_loss < best_dict['loss']:
         wandb.run.summary['best_loss'] = best_dict['loss']
         best_dict['loss'] = valid_loss
-    if cfg.use_wandb:
-        wandb.log(wandb_dict)
     
     return valid_score, valid_loss
 
