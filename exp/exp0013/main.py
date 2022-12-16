@@ -170,7 +170,7 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
     return train_loader, valid_loader
 
 
-def valid_function(cfg, fold, epoch, dataloader, encoder, decoder, loss_fn, device, wandb_dict, best_dict, save_path):
+def valid_function(cfg, fold, epoch, dataloader, encoder, decoder, loss_fn, device, best_dict, save_path):
     encoder.eval()
     decoder.eval()
 
@@ -281,7 +281,7 @@ def train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder,
             train_score = rmse(targets_all, preds_all)
             train_loss = losses.avg
 
-            valid_score, valid_loss = valid_function(cfg, fold, epoch, valid_loader, encoder, decoder, loss_fn, device, wandb_dict, best_dict, save_path)
+            valid_score, valid_loss = valid_function(cfg, fold, epoch, valid_loader, encoder, decoder, loss_fn, device, best_dict, save_path)
             
             wandb_dict = dict(
                 epoch = (num_valids_per_epoch * (epoch - 1)) + (step // num_valids_per_epoch), # wandbでは1回のvalidを1epochとする
