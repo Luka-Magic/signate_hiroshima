@@ -74,7 +74,7 @@ class HiroshimaDataset(Dataset):
 
          # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
         if phase == 'train':
-            border_interval = 3
+            border_interval = 1
         else:
             border_interval = 24
         for border in tqdm(range(start_row, last_row, border_interval)):
