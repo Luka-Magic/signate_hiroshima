@@ -276,9 +276,9 @@ def train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder,
         
         # validとlog、モデルの保存などを行う
         if step % num_valids_per_epoch == 0:
-            preds_all = np.concatenate(preds_all)
-            targets_all = np.concatenate(targets_all)
-            train_score = rmse(targets_all, preds_all)
+            preds_concat = np.concatenate(preds_all)
+            targets_concat = np.concatenate(targets_all)
+            train_score = rmse(targets_concat, preds_concat)
             train_loss = losses.avg
 
             valid_score, valid_loss = valid_function(cfg, fold, epoch, valid_loader, encoder, decoder, loss_fn, device, best_dict, save_path)
