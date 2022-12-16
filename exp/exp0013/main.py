@@ -186,6 +186,7 @@ def train_one_epoch(cfg, epoch, dataloader, encoder, decoder, loss_fn, device, e
     for step, (data, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
+        print(data.shape, target.shape)
 
         h, c = encoder(data) # h: (layers=1, bs, hidden_size), c: (layers=1, bs, hidden_size) 
         repeat_input = h.transpose(1, 0).repeat(1, cfg.output_sequence_size, 1) # repeat_input: (bs, len_of_series, hidden_size)
