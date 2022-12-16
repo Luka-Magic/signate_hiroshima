@@ -1,5 +1,6 @@
 from pathlib import Path
 import gc
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -78,6 +79,8 @@ class HiroshimaDataset(Dataset):
         else:
             border_interval = 24
         for border in tqdm(range(start_row, last_row, border_interval)):
+            if random.random() < cfg.train_data_ratio:
+                continue
             input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
             input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
             input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
