@@ -2,7 +2,7 @@
 use_wandb: True
 wandb_project: signate_hiroshima
 water_csv_path: data/timeseries/water.csv
-device: cuda
+device: cpu
 seed: 77
 save_model: True
 
