@@ -244,7 +244,7 @@ def train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder,
 
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
 
-    num_valids_per_epoch = len(pbar) // cfg.num_valids_per_epoch # validを行うstep数
+    step_valid = len(pbar) // cfg.num_valids_per_epoch # validを行うstep数
 
     for step, (data, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
@@ -275,7 +275,7 @@ def train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder,
         targets_all += [target]
         
         # validとlog、モデルの保存などを行う
-        if step % num_valids_per_epoch == 0:
+        if step % step_valid == 0:
             preds_concat = np.concatenate(preds_all)
             targets_concat = np.concatenate(targets_all)
             train_score = rmse(targets_concat, preds_concat)
@@ -284,7 +284,7 @@ def train_valid_one_epoch(cfg, fold, epoch, train_loader, valid_loader, encoder,
             valid_score, valid_loss = valid_function(cfg, fold, epoch, valid_loader, encoder, decoder, loss_fn, device, best_dict, save_path)
             
             wandb_dict = dict(
-                epoch = (num_valids_per_epoch * (epoch - 1)) + (step // num_valids_per_epoch), # wandbでは1回のvalidを1epochとする
+                epoch = (cfg.num_valids_per_epoch * (epoch - 1)) + (step // step_valid), # wandbでは1回のvalidを1epochとする
                 train_score = train_score,
                 train_loss = train_loss,
                 valid_score = valid_score,
