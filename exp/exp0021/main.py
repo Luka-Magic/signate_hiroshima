@@ -122,8 +122,8 @@ class HiroshimaDataset(Dataset):
             input_ = input_.values.T # size=(len(station), len(時間))
 
             # 入力の長さがRNNの入力に足りないとき => 前にpadding
-            if self.input_sequence_size > input_.shape[1]:
-                pad_length = cfg.input_sequence_size - input_.shape[1]
+            if input_length > input_.shape[1]:
+                pad_length = input_length - input_.shape[1]
                 pad = np.tile(np.array(input_[:, 0][:, np.newaxis]), (1, pad_length))
                 input_ = np.concatenate([pad, input_], axis=1)
             
