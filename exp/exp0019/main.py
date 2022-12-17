@@ -367,8 +367,7 @@ def main():
                 wandb.run.summary['best_score'] = best_dict['score']
                 save_dict = {
                     'epoch': epoch,
-                    'encoder': encoder.state_dict(),
-                    'decoder': decoder.state_dict(),
+                    'model': model.state_dict(),
                 }
                 torch.save(save_dict, str(save_path / f'best_score_fold{fold}.pth'))
                 print(f'score update!: {best_dict["score"]:.4f}')
@@ -379,7 +378,7 @@ def main():
                 wandb.log(wandb_dict)
         
         wandb.finish()
-        del encoder, decoder, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, encoder_optimizer, decoder_optimizer, best_dict
+        del model, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, optimizer, best_dict
         gc.collect()
         torch.cuda.empty_cache()
 
