@@ -143,16 +143,14 @@ class Encoder(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
     
     def forward(self, x, h0=None):
         '''
             x: (bs, len_of_series ,input_size)
             h0 = Tuple(h, c)
         '''
-        x, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
-        x = self.fc(x) # -> x: (bs, len_of_series, output_size)
-        return x, h
+        _, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
+        return h
 
 
 class Decoder(nn.Module):
@@ -169,6 +167,7 @@ class Decoder(nn.Module):
         x, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
         x = self.fc(x) # -> x: (bs, len_of_series, output_size)
         return x, h
+
 
 class Model(nn.Module):
     def __init__(self, cfg, device):
