@@ -267,7 +267,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
         target = target.to(device).float() # (bs, len_of_series)
 
         with torch.no_grad():
-            pred = model(data, target, 0.).squeeze().squeeze()
+            pred = model(data, target, 0.).squeeze()
 
             # 評価用のlossの算出
             loss = 0
