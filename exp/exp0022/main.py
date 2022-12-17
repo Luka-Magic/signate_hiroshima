@@ -147,7 +147,7 @@ class HiroshimaDataset(Dataset):
                 input_tde[:, i] = np.roll(input_, i*self.tau)[(self.d - 1)*self.tau:]
             input_ = torch.tensor(input_tde) # input_: (len_of_series, input_size)
         else:
-            input_ = torch.tensor(input_)
+            input_ = torch.tensor(input_).unsqueeze(-1)
         target = torch.tensor(target) # target: (len_of_series)
 
         return input_, target, meta
