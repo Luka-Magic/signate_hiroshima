@@ -171,13 +171,13 @@ class Decoder(nn.Module):
         return x, h
 
 class Model(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, device):
         super().__init__()
         self.input_size = cfg.input_size
         self.hidden_size = cfg.hidden_size
         self.output_size = cfg.output_size
         self.output_sequence_size = cfg.output_sequence_size
-        self.device = cfg.device
+        self.device = device
 
         self.encoder = Encoder(self.input_size, self.hidden_size, self.output_size)
         self.decoder = Decoder(self.hidden_size, self.output_size)
@@ -325,7 +325,7 @@ def main():
         train_fold_df, valid_fold_df, st2info = preprocess(cfg, train_fold_df, valid_fold_df)
         train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info)
 
-        model = Model(cfg).to(device)
+        model = Model(cfg, device).to(device)
 
         if cfg.loss_fn == 'MSELoss':
             loss_fn = nn.MSELoss()
