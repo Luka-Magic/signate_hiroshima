@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 import sys
-sys.path.append('process')
+sys.path.append('utils')
 
 from water import water_process1
 from rain import rain_process1
@@ -11,7 +11,7 @@ from river import river_process1
 import warnings
 warnings.simplefilter('ignore')
 
-def preprocess(data_dir, save_dir=None):
+def get_data(data_dir, save_dir=None):
     '''
 
         data_dir: str or Path
@@ -44,7 +44,8 @@ def preprocess(data_dir, save_dir=None):
             主キー(id)としたdatabaseを作る。全データの河川名と水系名
             をidで表す。
         
-        5. save_dirに9つのcsvファイルを保存する。
+        5.  save_dirがNoneでなければ9つのcsvファイルを保存する。
+            Noneなら変数を返す。
 
         --------------------------------
 
@@ -55,7 +56,9 @@ def preprocess(data_dir, save_dir=None):
     assert data_dir.name == 'train', f'data_dirのディレクトリ名の最後が"train"である必要があります。input: {str(data_dir)}'
     if save_dir is not None:
         save_dir = Path(save_dir)
+        save_dir.mkdir(exist_ok=True)
     
+
     # 1. データを読み込む
     print('1. データ読み込み')
     rain = pd.read_csv(data_dir / 'rainfall' / 'data.csv')
@@ -67,12 +70,14 @@ def preprocess(data_dir, save_dir=None):
     dam = pd.read_csv(data_dir / 'dam.csv')
     print(' => complete')
 
+
     # 2. 3つのデータに対し前処理 & database化
     print('2. 3つのデータに前処理 & database化')
     rain, rain_st = rain_process1(rain, rain_st)
     tide, tide_st = tide_process1(tide, tide_st)
     water, water_st = water_process1(water, water_st)
     print(' => complete')
+
 
     # 3. 1つのstationに対し値を一列に時系列で並べる
     print('3. 1つのstationに対し値を一列に時系列で並べる')
@@ -81,24 +86,35 @@ def preprocess(data_dir, save_dir=None):
     water = convert_timeseries(water)
     print(' => complete')
 
+
     # 4. 河川名、水系名について処理
     print('4. 河川名、水系名について処理')
     (rain_st, tide_st, water_st, dam, river_table, river_system_table) = \
         river_process1(rain_st, tide_st, water_st, dam)
     print(' => complete')
 
+
     # 5. 保存
     if save_dir is not None:
+        print('5. 保存')
+        (save_dir / 'rainfall').mkdir(exist_ok=True)
         rain.to_csv(save_dir / 'rainfall' / 'data.csv', index=False)
         rain_st.to_csv(save_dir / 'rainfall' / 'stations.csv', index=False)
+
+        (save_dir / 'tidelevel').mkdir(exist_ok=True)
         tide.to_csv(save_dir / 'tidelevel' / 'data.csv', index=False)
         tide_st.to_csv(save_dir / 'tidelevel' / 'stations.csv', index=False)
+
+        (save_dir / 'waterlevel').mkdir(exist_ok=True)
         water.to_csv(save_dir / 'waterlevel' / 'data.csv', index=False)
         water_st.to_csv(save_dir / 'waterlevel' / 'stations.csv', index=False)
+
         dam.to_csv(save_dir / 'dam.csv', index=False)
         river_table.to_csv(save_dir / 'river_table.csv', index=False)
         river_system_table.to_csv(save_dir / 'river_system_table.csv', index=False)
-        print('All Complete!!!')
+
+        print('\nAll Complete!!!')
     else:
-        print('All Complete!!!')
+        print('5. 変数を返す')
+        print('\nAll Complete!!!')
         return (rain, rain_st, tide, tide_st, water, water_st, dam, river_table, river_system_table)
