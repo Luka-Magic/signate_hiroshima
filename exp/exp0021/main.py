@@ -148,7 +148,7 @@ class HiroshimaDataset(Dataset):
         input_tde = torch.tensor(input_tde) # input_: (len_of_series, input_size)
         target = torch.tensor(target) # target: (len_of_series)
 
-        return input_, target, meta
+        return input_tde, target, meta
 
 
 class Encoder(nn.Module):
