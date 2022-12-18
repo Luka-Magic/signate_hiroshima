@@ -11,20 +11,9 @@ from hydra.experimental import compose, initialize_config_dir
 from preprocess.preprocess import get_data
 
 
-def preprocess(cfg, df):
+def preprocess(cfg, df, st2mean):
     # string -> floatに (strの欠損値を全てnanとする)
     df = df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
-
-    # # 標準化
-    # df_meta = df[['date', 'hour']]
-    # df_data = df.drop(columns=['date', 'hour'])
-    # df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)
-    # df = pd.concat([df_meta, df_zscore_data], axis=1)
-    
-    # # 標準化に使った値は後で戻す時のために変数に入れておく
-    # st2mean = df_data.mean(skipna=True).to_dict()
-    # st2std = df_data.std(skipna=True).to_dict()
-    # st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
 
     return df
     
@@ -67,6 +56,10 @@ class HiroshimaDataset(Dataset):
 
         meta = self.st2info[self.stations[idx]]
         meta['station'] = self.stations[idx]
+
+        # 入力を標準化
+        input_ = (input_ - meta['mean']) / meta['std']
+
         if self.d > 1:
             input_tde = np.zeros((self.input_sequence_size, self.d))
             for i in range(self.d):
