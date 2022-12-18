@@ -54,7 +54,7 @@ class HiroshimaDataset(Dataset):
             pad = np.tile(np.array(input_[:, 0][:, np.newaxis]), (1, pad_length))
             input_ = np.concatenate([pad, input_], axis=1)
         
-        self.inputs += input_.tolist()
+        self.inputs = input_.tolist()
         self.stations = df.drop(columns=['date', 'hour']).columns
 
     def __len__(self):
