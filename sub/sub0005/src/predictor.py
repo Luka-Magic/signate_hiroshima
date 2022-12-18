@@ -230,6 +230,8 @@ class ScoringService(object):
 
 
         # 学習データを標準化
+        print(cls.train_water.columns)
+        print(cls.train_water.shape)
         df_data = cls.train_water.drop(columns=['date', 'hour'])
         st2mean = df_data.mean(skipna=True).to_dict()
         st2std = df_data.std(skipna=True).to_dict()
