@@ -135,12 +135,14 @@ class HiroshimaDataset(Dataset):
         input_ = np.array(self.inputs[idx]).astype(np.float32)
         target = self.targets[idx]
         # meta = self.st2info[self.stations[idx]]
-        
+
         meta = {}
 
         meta['mean'] = input_.mean()
         meta['std'] = input_.std()
+        print(input_.shape)
         input_ = (input_ - input_.mean()) / input_.std()
+        print(input_.shape)
 
         meta['station'] = self.stations[idx]
         meta['border'] = self.borders[idx]
