@@ -231,12 +231,10 @@ class ScoringService(object):
 
         # 学習データを標準化
         df_data = cls.train_water.drop(columns=['date', 'hour'])
-        print(df_data.shape)
+        df_data = df_data.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
         st2mean = df_data.mean(skipna=True).to_dict()
         st2std = df_data.std(skipna=True).to_dict()
         st_id2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
-        print(cls.water_st.shape)
-        print(st2mean)
 
         # st2id
         st2id = cls.water_st[['id', 'station']].set_index('station')['id'].to_dict()
