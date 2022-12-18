@@ -139,8 +139,8 @@ class HiroshimaDataset(Dataset):
         meta = {}
 
         meta['mean'] = input_.mean()
-        meta['std'] = input_.std()
-        input_ = (input_ - input_.mean()) / (input_.std() + 1e-7)
+        meta['std'] = input_.std() + 1e-7
+        input_ = (input_ - input_.mean()) / (input_.std())
 
         meta['station'] = self.stations[idx]
         meta['border'] = self.borders[idx]
