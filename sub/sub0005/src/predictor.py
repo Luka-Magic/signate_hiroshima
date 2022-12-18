@@ -124,7 +124,7 @@ class Model(nn.Module):
 
         self.encoder = Encoder(self.input_size, self.hidden_size, self.output_size)
         self.decoder = Decoder(self.hidden_size, self.output_size, attention=cfg.attention)
-    
+
     def forward(self, x):
         hs, encoder_state = self.encoder(x, h0=None)
         decoder_input = x[:, -1:, :1]
