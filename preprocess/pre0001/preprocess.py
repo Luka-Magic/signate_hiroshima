@@ -1,11 +1,11 @@
 from pathlib import Path
 import pandas as pd
 
-from utils.water import water_process1
-from utils.rain import rain_process1
-from utils.tide import tide_process1
-from utils.timeseries import convert_timeseries
-from utils.river import river_process1
+from water import water_process1
+from rain import rain_process1
+from tide import tide_process1
+from timeseries import convert_timeseries
+from river import river_process1
 import warnings
 warnings.simplefilter('ignore')
 
