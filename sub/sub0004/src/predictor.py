@@ -144,10 +144,10 @@ class Model(nn.Module):
         return pred
 
 
-def load_models(cfg, model_dir):
+def load_models(cfg, model_dir, device):
     models = []
     for model_path in model_dir.glob('*.pth'):
-        model = Model(cfg)
+        model = Model(cfg, device)
         path_dict = torch.load(model_path, map_location='cpu')
         model.load_state_dict(path_dict['model'])
         model = {
@@ -221,7 +221,7 @@ class ScoringService(object):
             cfg = compose(config_name='config.yaml')
             cls.cfg = cfg
         
-        cls.models = load_models(cfg, model_path)
+        cls.models = load_models(cfg, model_path, cls.device)
 
         return True
 
