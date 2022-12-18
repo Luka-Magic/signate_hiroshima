@@ -15,18 +15,18 @@ def preprocess(cfg, df):
     # string -> floatに (strの欠損値を全てnanとする)
     df = df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
 
-    # 標準化
-    df_meta = df[['date', 'hour']]
-    df_data = df.drop(columns=['date', 'hour'])
-    df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)
-    df = pd.concat([df_meta, df_zscore_data], axis=1)
+    # # 標準化
+    # df_meta = df[['date', 'hour']]
+    # df_data = df.drop(columns=['date', 'hour'])
+    # df_zscore_data = (df_data - df_data.mean(skipna=True)) / df_data.std(skipna=True)
+    # df = pd.concat([df_meta, df_zscore_data], axis=1)
     
-    # 標準化に使った値は後で戻す時のために変数に入れておく
-    st2mean = df_data.mean(skipna=True).to_dict()
-    st2std = df_data.std(skipna=True).to_dict()
-    st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
+    # # 標準化に使った値は後で戻す時のために変数に入れておく
+    # st2mean = df_data.mean(skipna=True).to_dict()
+    # st2std = df_data.std(skipna=True).to_dict()
+    # st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
 
-    return df, st2info
+    return df
     
 
 class HiroshimaDataset(Dataset):
@@ -228,6 +228,18 @@ class ScoringService(object):
         cls.train_rain, cls.rain_st, cls.train_tide, cls.tide_st, cls.train_water, \
             cls.water_st, cls.dam, cls.river, cls.river_system = get_data(data_dir)
 
+
+        # 学習データを標準化
+        df_data = cls.train_water.drop(columns=['date', 'hour'])
+        st2mean = df_data.mean(skipna=True).to_dict()
+        st2std = df_data.std(skipna=True).to_dict()
+        st_id2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
+        print(st_id2info)
+
+        # st2id
+        st2id = cls.water_st[['id', 'station']].set_index('station')['id'].to_dict()
+        cls.st2info = {st: st_id2info[st2id[st]] for st in st2id.keys()}
+
         cls.models = load_models(cfg, model_path, cls.device)
 
         return True
@@ -252,10 +264,10 @@ class ScoringService(object):
         # 前処理
         input_columns = stations + ['date', 'hour']
         input_df = cls.water_df.loc[:, input_columns]
-        input_df, st2info = preprocess(cfg, input_df)
+        input_df = preprocess(cfg, input_df)
 
         # dataloaderの用意
-        test_ds = HiroshimaDataset(cfg, input_df, st2info)
+        test_ds = HiroshimaDataset(cfg, input_df, cls.st2info)
         test_loader = DataLoader(
             test_ds,
             batch_size=cfg.test_bs,
