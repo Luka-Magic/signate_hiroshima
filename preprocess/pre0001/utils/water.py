@@ -7,7 +7,6 @@ def water_process1(water, water_st):
     water = water[~((water['date'] <= 1304) & (water['station'] == '大谷池'))]
     water = water[~((water['date'] <= 699) & (water['station'] == "白川"))]
     water = water[~((water['date'] <= 94) & (water['station'] == "山手左岸(国)"))]
-    print('debug, water_date_nunique: ', water['date'].nunique())
 
     # data.csvのstation名についている(電)は全て消して良い
     water['station'] = water['station'].str.replace(r'\(電\)', '')

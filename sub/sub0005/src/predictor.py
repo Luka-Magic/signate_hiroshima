@@ -8,6 +8,8 @@ from torch.utils.data import Dataset, DataLoader
 
 from hydra.experimental import compose, initialize_config_dir
 
+from preprocess.preprocess import get_data
+
 
 def preprocess(cfg, df):
     # string -> floatに (strの欠損値を全てnanとする)
@@ -205,6 +207,7 @@ def postprocess(preds_all, df):
     output = df[['hour', 'station', 'value']].to_dict('records')
     return output
 
+
 class ScoringService(object):
     @classmethod
     def get_model(cls, model_path):
@@ -216,11 +219,15 @@ class ScoringService(object):
 
         model_path = Path(model_path)
         root_dir = model_path.parent.resolve()
+        data_dir = root_dir / 'model' / 'train'
         
         with initialize_config_dir(config_dir=str(root_dir / 'src' / 'config')):
             cfg = compose(config_name='config.yaml')
             cls.cfg = cfg
-        
+
+        cls.train_rain, cls.rain_st, cls.train_tide, cls.tide_st, cls.train_water, \
+            cls.water_st, cls.dam, cls.river, cls.river_system = get_data(data_dir)
+
         cls.models = load_models(cfg, model_path, cls.device)
 
         return True
