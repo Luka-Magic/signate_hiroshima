@@ -234,7 +234,8 @@ class ScoringService(object):
         st2mean = df_data.mean(skipna=True).to_dict()
         st2std = df_data.std(skipna=True).to_dict()
         st_id2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
-        print(st_id2info)
+        print(cls.water_st.shape)
+        print(st2mean)
 
         # st2id
         st2id = cls.water_st[['id', 'station']].set_index('station')['id'].to_dict()
