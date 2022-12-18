@@ -11,7 +11,7 @@ from hydra.experimental import compose, initialize_config_dir
 from preprocess.preprocess import get_data
 
 
-def preprocess(cfg, df, st2mean):
+def preprocess(cfg, df):
     # string -> floatに (strの欠損値を全てnanとする)
     df = df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
 
