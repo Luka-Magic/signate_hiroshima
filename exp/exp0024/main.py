@@ -259,6 +259,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         losses.update(loss.item(), len(data))
         # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
         # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        pred = pred.detach().cpu().numpy()
+        target = target.detach().cpu().numpy()
         preds_all += [pred]
         targets_all += [target]
     
@@ -301,6 +303,8 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             # 評価用にRMSEを算出
             # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
             # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            pred = pred.detach().cpu().numpy()
+            target = target.detach().cpu().numpy()
             preds_all += [pred]
             targets_all += [target]
 
