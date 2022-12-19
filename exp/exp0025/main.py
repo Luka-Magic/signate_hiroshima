@@ -1,0 +1,441 @@
+from pathlib import Path
+import gc
+import random
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.metrics import mean_squared_error
+from torch.nn.init import xavier_uniform_
+
+from tqdm import tqdm
+
+from utils import rmse, AverageMeter, seed_everything
+
+import hydra
+from omegaconf import OmegaConf
+from hydra.experimental import compose, initialize_config_dir
+import wandb
+
+
+def load_data(cfg, root_path):  
+    df = pd.read_csv(str(root_path / cfg.water_csv_path))
+    dates = df['date'].astype(int).unique()
+    dates.sort()
+    folds = TimeSeriesSplit(n_splits=cfg.n_folds).split(dates)
+    df['fold'] = -1
+    for fold, (_, valid_dates) in enumerate(folds):
+        df.loc[df['date'].isin(valid_dates), 'fold'] = fold
+    return df
+
+
+def preprocess(cfg, train_fold_df, valid_fold_df):
+    # dataframeの前処理
+    train_fold_df = train_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
+    valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
+
+    # train_fold_dfの数値部分(date, hour以外)の前処理
+    train_meta = train_fold_df[['date', 'hour']]
+    train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
+    valid_meta = valid_fold_df[['date', 'hour']]
+    valid_data = valid_fold_df.drop(columns=['date', 'hour', 'fold'])
+
+    # 差分を学習・予測対象とする
+    concat_df = pd.concat([train_data, valid_data], axis=0) # 差分をとるために一度concat
+    concat_df = concat_df - concat_df.shift()
+    train_dif_data, valid_dif_data = concat_df.iloc[:len(train_data)], concat_df.iloc[len(train_data):]
+
+    ## train_fold_dfの標準化
+    train_zscore_data = (train_dif_data - train_dif_data.mean(skipna=True)) / train_dif_data.std(skipna=True)
+    train_fold_df = pd.concat([train_meta, train_zscore_data], axis=1)
+
+    # valid_fold_dfはtrainの平均と標準偏差で標準化
+    valid_zscore_df = (valid_dif_data - train_dif_data.mean(skipna=True)) / train_dif_data.std(skipna=True)
+    valid_fold_df = pd.concat([valid_meta, valid_zscore_df], axis=1)
+
+    # 標準化に使った値は後で戻す時のために変数に入れておく
+    st2mean = train_dif_data.mean(skipna=True).to_dict()
+    st2std = train_dif_data.std(skipna=True).to_dict()
+    st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
+    for st in st2mean.keys():
+        st2info[st]['train_raw_data'] = train_data[st]
+        st2info[st]['valid_raw_data'] = valid_data[st]
+
+    return train_fold_df, valid_fold_df, st2info
+
+
+def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
+    train_ds = HiroshimaDataset(cfg, train_fold_df, st2info, 'train')
+    valid_ds = HiroshimaDataset(cfg, valid_fold_df, st2info, 'valid')
+    
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.train_bs,
+        shuffle=True,
+        num_workers=cfg.n_workers,
+        pin_memory=True
+    )
+
+    valid_loader = DataLoader(
+        valid_ds,
+        batch_size=cfg.valid_bs,
+        shuffle=False,
+        num_workers=cfg.n_workers,
+        pin_memory=True
+    )
+    return train_loader, valid_loader
+
+
+class HiroshimaDataset(Dataset):
+    def __init__(self, cfg, df, st2info, phase):
+        super().__init__()
+
+        self.st2info = st2info
+        self.phase = phase
+        self.inputs = []
+        self.targets = []
+        self.stations = []
+        self.borders = []
+
+        self.d = cfg.tde_d
+        self.tau = cfg.tde_tau
+        self.input_sequence_size = cfg.input_sequence_size
+
+        first_index = df.index[0]
+        start_row = 24 # 最低でもはじめの24hは使う
+        last_row = len(df) # 最後の行まで使う (最後の24hは推論用)
+
+        # 入力に使う長さ: input_sequence_size + (d - 1) * tau 
+        input_length = self.input_sequence_size + (self.d - 1) * self.tau
+
+        # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
+        for border in tqdm(range(start_row, last_row, 24)):
+            assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
+            
+            input_ = df.iloc[max(border-input_length, 0):border, :].drop(columns=['date', 'hour'])
+            input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
+            input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
+            input_ = input_.fillna(0.) # 全てがnanなら０埋め
+            
+            target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
+
+            target = target.loc[:, ~target.isnull().any(axis=0)] # input, target共にnullがない列だけ抜き出す
+            self.stations += target.columns.tolist()
+            self.borders += [first_index + border]*len(target.columns)
+            input_ = input_.loc[:, target.columns] # targetに使われるinputだけ取り出す
+            input_ = input_.values.T # size=(len(station), len(時間))
+
+            # 入力の長さがRNNの入力に足りないとき => 前にpadding
+            if input_length > input_.shape[1]:
+                pad_length = input_length - input_.shape[1]
+                pad = np.tile(np.array(input_[:, 0][:, np.newaxis]), (1, pad_length))
+                input_ = np.concatenate([pad, input_], axis=1)
+            
+            self.inputs += input_.tolist()
+            self.targets += target.values.T.tolist()
+        print(f'{phase} datas: {len(self.inputs)}')
+
+    def __len__(self):
+        return len(self.inputs)
+    
+    def __getitem__(self, idx):
+        input_ = np.array(self.inputs[idx]).astype(np.float32)
+        target = self.targets[idx]
+        info = self.st2info[self.stations[idx]]
+        meta = {}
+        meta['mean'] = info['mean']
+        meta['std'] = info['std']
+        meta['station'] = self.stations[idx]
+        meta['border'] = self.borders[idx]
+        meta['input_last_value'] = info[f'{self.phase}_raw_data'].loc[meta['border'] - 1]
+
+        if self.d > 1:
+            input_tde = np.zeros((self.input_sequence_size, self.d))
+            for i in range(self.d):
+                input_tde[:, i] = np.roll(input_, i*self.tau)[(self.d - 1)*self.tau:]
+            input_ = torch.tensor(input_tde)
+        else:
+            input_ = torch.tensor(input_).unsqueeze(-1)
+        target = torch.tensor(target)
+
+        return input_, target, meta
+
+
+class Encoder(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
+    
+    def forward(self, x, h0=None):
+        '''
+            x: (bs, len_of_series ,input_size)
+            h0 = Tuple(h, c)
+        '''
+        hs, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
+        return hs, h
+
+
+class Decoder(nn.Module):
+    def __init__(self, hidden_size, output_size, attention=True):
+        super().__init__()
+        self.attention = attention
+
+        self.lstm = nn.LSTM(output_size, hidden_size, batch_first=True)
+        self.softmax = nn.Softmax(dim=1)
+        if attention:
+            self.fc = nn.Linear(hidden_size*2, output_size)
+        else:
+            self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x, h, hs):
+        '''
+            x: (bs, output_seq_size=1, output_size=1)
+            h = Tuple(h, c)
+            hs = (bs, input_seq_size, hidden_size)
+        '''
+        x, h = self.lstm(x, h) # x: (bs, output_seq_size=1, hidden_size)
+        if self.attention:
+            x_t = torch.transpose(x, 1, 2)
+            attention_weight = self.softmax(torch.bmm(hs, x_t)) # attention_weight: (bs, input_seq_size, output_seq_size=1)
+            weighted_hs = hs * attention_weight # weighted_hs: (bs, input_seq_size, hidden_size)
+            context = torch.sum(weighted_hs, dim=1, keepdim=True) # context: (bs, 1, hidden_size)
+            x = torch.cat([x, context], dim=2) # (bs, 1, hidden_size*2)
+        x = self.fc(x) # x: (bs, 1, output_size)
+        return x, h
+
+
+class Model(nn.Module):
+    def __init__(self, cfg, device):
+        super().__init__()
+        self.input_size = cfg.input_size
+        self.hidden_size = cfg.hidden_size
+        self.output_size = cfg.output_size
+        self.output_sequence_size = cfg.output_sequence_size
+        self.device = device
+
+        self.encoder = Encoder(self.input_size, self.hidden_size, self.output_size)
+        self.decoder = Decoder(self.hidden_size, self.output_size, attention=cfg.attention)
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+            """パラメータを初期化."""
+            for p in self.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p)
+    
+    def forward(self, x, target, teacher_forcing_ratio):
+        hs, encoder_state = self.encoder(x, h0=None)
+        decoder_input = x[:, -1:, :1]
+        decoder_state = encoder_state
+
+        pred = torch.empty(len(x), self.output_sequence_size, self.output_size).to(self.device).float()
+
+        for i in range(self.output_sequence_size):
+            decoder_output, decoder_state = self.decoder(decoder_input, decoder_state, hs) # decoder_output: (bs, 1, output_size=1)
+            pred[:, i:i+1, :] = decoder_output
+            teacher_force = random.random() < teacher_forcing_ratio
+            decoder_input = target[:, i:i+1].unsqueeze(-1) if teacher_force else decoder_output
+        return pred
+
+
+def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, scheduler, scheduler_step_time):
+    def get_lr(optimizer):
+        for param_group in optimizer.param_groups:
+            return param_group['lr']
+    
+    model.train()
+
+    preds_all = []
+    targets_all = []
+
+    losses = AverageMeter()
+
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader))
+
+    teacher_forcing_ratio = cfg.teacher_forcing_ratio_rate ** (epoch - 1)
+
+    for step, (data, target, meta) in pbar:
+        data = data.to(device).float() # (bs, len_of_series, input_size)
+        target = target.to(device).float() # (bs, len_of_series)
+
+        pred = model(data, target, teacher_forcing_ratio).squeeze()
+
+        # 評価用のlossの算出
+        loss = 0
+        for i in range(pred.size()[1]):
+            loss += loss_fn(pred[:, i], target[:, i])
+        losses.update(loss.item(), len(data))
+        
+        optimizer.zero_grad()
+
+        loss.backward()
+        optimizer.step()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+        if scheduler is not None and scheduler_step_time=='step':
+            scheduler.step()
+        
+        losses.update(loss.item(), len(data))
+        pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        input_last_value = meta['input_last_value'].unsqueeze(-1).numpy()
+        pred = np.cumsum(pred, axis=1) + input_last_value
+        target = np.cumsum(target, axis=1) + input_last_value
+        preds_all += [pred]
+        targets_all += [target]
+    
+    if scheduler is not None and scheduler_step_time=='epoch':
+        scheduler.step()
+
+    preds_all = np.concatenate(preds_all)
+    targets_all = np.concatenate(targets_all)
+    score = rmse(targets_all, preds_all)
+
+    lr = get_lr(optimizer)
+    
+    print(f'Train - Epoch {epoch}: losses {losses.avg:.4f}, scores: {score}')
+    return score, losses.avg, lr, teacher_forcing_ratio
+
+
+def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
+    model.eval()
+
+    preds_all = []
+    targets_all = []
+
+    losses = AverageMeter()
+
+    pbar = tqdm(enumerate(dataloader), total=len(dataloader))
+
+    for step, (data, target, meta) in pbar:
+        data = data.to(device).float() # (bs, len_of_series, input_size)
+        target = target.to(device).float() # (bs, len_of_series)
+
+        with torch.no_grad():
+            pred = model(data, target, 0.).squeeze()
+
+            # 評価用のlossの算出
+            loss = 0
+            for i in range(pred.size()[1]):
+                loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目をsqueeze
+            losses.update(loss.item(), len(data))
+
+            # 評価用にRMSEを算出
+            pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            
+            input_last_value = meta['input_last_value'].unsqueeze(-1).numpy()
+            pred = np.cumsum(pred, axis=1) + input_last_value
+            target = np.cumsum(target, axis=1) + input_last_value
+            preds_all += [pred]
+            targets_all += [target]
+
+    preds_all = np.concatenate(preds_all)
+    targets_all = np.concatenate(targets_all)
+    score = rmse(targets_all, preds_all)
+
+    print(f'Valid - Epoch {epoch}: losses {losses.avg:.4f}, scores {score:.4f}')
+    return score, losses.avg
+
+
+def main():
+    exp_path = Path.cwd()
+    root_path = Path.cwd().parents[2]
+    save_path = root_path / 'outputs' / exp_path.name
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    with initialize_config_dir(config_dir=str(exp_path / 'config')):
+        cfg = compose(config_name='config.yaml')
+    
+    seed_everything(cfg.seed)
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    if cfg.use_wandb:
+        wandb.login()
+    
+    df = load_data(cfg, root_path)
+
+    for fold in range(cfg.n_folds):
+        if fold not in cfg.use_folds:
+            continue
+        
+        if cfg.use_wandb:
+            wandb.config = OmegaConf.to_container(
+                cfg, resolve=True, throw_on_missing=True)
+            wandb.init(project=cfg.wandb_project, entity='luka-magic',
+                        name=f'{exp_path.name}', config=wandb.config)
+            wandb.config.fold = fold
+        train_fold_df = df[df['fold'] < fold]
+        valid_fold_df = df[df['fold'] == fold]
+        train_fold_df = train_fold_df.sort_values(['date', 'hour'])
+        valid_fold_df = valid_fold_df.sort_values(['date', 'hour'])
+
+        train_fold_df, valid_fold_df, st2info = preprocess(cfg, train_fold_df, valid_fold_df)
+        train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info)
+
+        model = Model(cfg, device).to(device)
+
+        if cfg.loss_fn == 'MSELoss':
+            loss_fn = nn.MSELoss()
+        else:
+            loss_fn = nn.MSELoss()
+        
+        if cfg.optimizer == 'AdamW':
+            optimizer = torch.optim.AdamW(
+                model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    
+        if cfg.scheduler == 'OneCycleLR':
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer, total_steps=cfg.n_epochs * len(train_loader), max_lr=cfg.lr, pct_start=cfg.pct_start, div_factor=cfg.div_factor, final_div_factor=cfg.final_div_factor)
+        else:
+            scheduler  = None
+        scheduler_step_time = cfg.scheduler_step_time
+
+        best_dict = dict(
+            score=float('inf'),
+            loss=float('inf'),
+        )
+        
+        for epoch in range(1, cfg.n_epochs+1):
+            # 学習
+            train_score, train_loss, lr, teacher_forcing_ratio = train_one_epoch(cfg, epoch, train_loader, model, loss_fn, device, optimizer, scheduler, scheduler_step_time)
+            # 推論
+            valid_score, valid_loss = valid_one_epoch(cfg, epoch, valid_loader, model, loss_fn, device)
+
+            wandb_dict = dict(
+                epoch=epoch,
+                train_score=train_score,
+                train_loss=train_loss,
+                valid_score=valid_score,
+                valid_loss=valid_loss,
+                lr = lr,
+                teacher_forcing_ratio = teacher_forcing_ratio
+            )
+            if valid_score < best_dict['score']:
+                best_dict['score'] = valid_score
+                wandb.run.summary['best_score'] = best_dict['score']
+                save_dict = {
+                    'epoch': epoch,
+                    'model': model.state_dict(),
+                }
+                torch.save(save_dict, str(save_path / f'best_score_fold{fold}.pth'))
+                print(f'score update!: {best_dict["score"]:.4f}')
+            if valid_loss < best_dict['loss']:
+                wandb.run.summary['best_loss'] = best_dict['loss']
+                best_dict['loss'] = valid_loss
+            if cfg.use_wandb:
+                wandb.log(wandb_dict)
+        
+        wandb.finish()
+        del model, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, optimizer, best_dict
+        gc.collect()
+        torch.cuda.empty_cache()
+
+if __name__ == '__main__':
+    main()
