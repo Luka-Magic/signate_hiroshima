@@ -10,6 +10,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
+from torch.nn.init import xavier_uniform_
 
 from tqdm import tqdm
 
@@ -218,6 +219,14 @@ class Model(nn.Module):
 
         self.encoder = Encoder(self.input_size, self.hidden_size, self.output_size)
         self.decoder = Decoder(self.hidden_size, self.output_size, attention=cfg.attention)
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+            """パラメータを初期化."""
+            for p in self.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p)
     
     def forward(self, x, target, teacher_forcing_ratio):
         hs, encoder_state = self.encoder(x, h0=None)
@@ -266,6 +275,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
 
         loss.backward()
         optimizer.step()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
         if scheduler is not None and scheduler_step_time=='step':
             scheduler.step()
