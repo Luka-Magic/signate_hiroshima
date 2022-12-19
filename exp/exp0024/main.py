@@ -365,8 +365,8 @@ def main():
         train_fold_df = train_fold_df.sort_values(['date', 'hour'])
         valid_fold_df = valid_fold_df.sort_values(['date', 'hour'])
 
-        train_fold_df, valid_fold_df = preprocess(cfg, train_fold_df, valid_fold_df)
-        train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df)
+        train_fold_df, valid_fold_df, st2info = preprocess(cfg, train_fold_df, valid_fold_df)
+        train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info)
 
         model = Model(cfg, device).to(device)
 
