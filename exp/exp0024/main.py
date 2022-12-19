@@ -37,31 +37,39 @@ def preprocess(cfg, train_fold_df, valid_fold_df):
     train_fold_df = train_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
     valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
 
-    # # train_fold_dfの数値部分(date, hour以外)の処理
-    # train_meta = train_fold_df[['date', 'hour']]
-    # train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
+    # train_fold_dfの数値部分(date, hour以外)の前処理
+    train_meta = train_fold_df[['date', 'hour']]
+    train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
+    valid_meta = valid_fold_df[['date', 'hour']]
+    valid_data = valid_fold_df.drop(columns=['date', 'hour', 'fold'])
 
-    # ## train_fold_dfの標準化
-    # train_zscore_data = (train_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
-    # train_fold_df = pd.concat([train_meta, train_zscore_data], axis=1)
+    # 差分を学習・予測対象とする
+    concat_df = pd.concat([train_data, valid_data], axis=0) # 差分をとるために一度concat
+    concat_df = concat_df - concat_df.shift()
+    train_dif_data, valid_dif_data = concat_df.iloc[:len(train_data)], concat_df.iloc[len(train_data):]
 
-    # # valid_fold_dfはtrainの平均と標準偏差で標準化
-    # valid_meta = valid_fold_df[['date', 'hour']]
-    # valid_data = valid_fold_df.drop(columns=['date', 'hour', 'fold'])
-    # valid_zscore_df = (valid_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
-    # valid_fold_df = pd.concat([valid_meta, valid_zscore_df], axis=1)
+    ## train_fold_dfの標準化
+    train_zscore_data = (train_dif_data - train_dif_data.mean(skipna=True)) / train_dif_data.std(skipna=True)
+    train_fold_df = pd.concat([train_meta, train_zscore_data], axis=1)
 
-    # # 標準化に使った値は後で戻す時のために変数に入れておく
-    # st2mean = train_data.mean(skipna=True).to_dict()
-    # st2std = train_data.std(skipna=True).to_dict()
-    # st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
+    # valid_fold_dfはtrainの平均と標準偏差で標準化
+    valid_zscore_df = (valid_dif_data - train_dif_data.mean(skipna=True)) / train_dif_data.std(skipna=True)
+    valid_fold_df = pd.concat([valid_meta, valid_zscore_df], axis=1)
 
-    return train_fold_df, valid_fold_df
+    # 標準化に使った値は後で戻す時のために変数に入れておく
+    st2mean = train_dif_data.mean(skipna=True).to_dict()
+    st2std = train_dif_data.std(skipna=True).to_dict()
+    st2info = {st: {'mean': st2mean[st], 'std': st2std[st]} for st in st2mean.keys()}
+    for st in st2mean.keys():
+        st2info[st]['train_raw_data'] = train_data[st]
+        st2info[st]['valid_raw_data'] = valid_data[st]
+
+    return train_fold_df, valid_fold_df, st2info
 
 
-def prepare_dataloader(cfg, train_fold_df, valid_fold_df):
-    train_ds = HiroshimaDataset(cfg, train_fold_df, 'train')
-    valid_ds = HiroshimaDataset(cfg, valid_fold_df, 'valid')
+def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info):
+    train_ds = HiroshimaDataset(cfg, train_fold_df, st2info, 'train')
+    valid_ds = HiroshimaDataset(cfg, valid_fold_df, st2info, 'valid')
     
     train_loader = DataLoader(
         train_ds,
@@ -82,9 +90,10 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df):
 
 
 class HiroshimaDataset(Dataset):
-    def __init__(self, cfg, df, phase):
+    def __init__(self, cfg, df, st2info, phase):
         super().__init__()
 
+        self.st2info = st2info
         self.inputs = []
         self.targets = []
         self.stations = []
@@ -134,9 +143,13 @@ class HiroshimaDataset(Dataset):
     def __getitem__(self, idx):
         input_ = np.array(self.inputs[idx]).astype(np.float32)
         target = self.targets[idx]
+        info = self.st2info[self.stations[idx]]
         meta = {}
+        meta['mean'] = info['mean']
+        meta['std'] = info['std']
         meta['station'] = self.stations[idx]
         meta['border'] = self.borders[idx]
+        meta['input_last_value'] = info[f'{self.phase}_raw_data'].loc[meta['border'] - 1]
 
         if self.d > 1:
             input_tde = np.zeros((self.input_sequence_size, self.d))
@@ -257,10 +270,11 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
             scheduler.step()
         
         losses.update(loss.item(), len(data))
-        # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        pred = pred.detach().cpu().numpy()
-        target = target.detach().cpu().numpy()
+        pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        input_last_value = meta['input_last_value'].unsqueeze(-1).numpy()
+        pred = np.cumsum(pred, axis=1) + input_last_value
+        target = np.cumsum(target, axis=1) + input_last_value
         preds_all += [pred]
         targets_all += [target]
     
@@ -301,10 +315,12 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             losses.update(loss.item(), len(data))
 
             # 評価用にRMSEを算出
-            # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-            # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-            pred = pred.detach().cpu().numpy()
-            target = target.detach().cpu().numpy()
+            pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            
+            input_last_value = meta['input_last_value'].unsqueeze(-1).numpy()
+            pred = np.cumsum(pred, axis=1) + input_last_value
+            target = np.cumsum(target, axis=1) + input_last_value
             preds_all += [pred]
             targets_all += [target]
 
