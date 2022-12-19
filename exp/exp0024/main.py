@@ -94,6 +94,7 @@ class HiroshimaDataset(Dataset):
         super().__init__()
 
         self.st2info = st2info
+        self.phase = phase
         self.inputs = []
         self.targets = []
         self.stations = []
