@@ -134,14 +134,7 @@ class HiroshimaDataset(Dataset):
     def __getitem__(self, idx):
         input_ = np.array(self.inputs[idx]).astype(np.float32)
         target = self.targets[idx]
-        # meta = self.st2info[self.stations[idx]]
-
         meta = {}
-
-        meta['mean'] = input_.mean()
-        meta['std'] = input_.std() + 1e-7
-        input_ = (input_ - input_.mean()) / (input_.std() + 1e-7)
-
         meta['station'] = self.stations[idx]
         meta['border'] = self.borders[idx]
 
@@ -149,10 +142,10 @@ class HiroshimaDataset(Dataset):
             input_tde = np.zeros((self.input_sequence_size, self.d))
             for i in range(self.d):
                 input_tde[:, i] = np.roll(input_, i*self.tau)[(self.d - 1)*self.tau:]
-            input_ = torch.tensor(input_tde) # input_: (len_of_series, input_size)
+            input_ = torch.tensor(input_tde)
         else:
             input_ = torch.tensor(input_).unsqueeze(-1)
-        target = torch.tensor(target) # target: (len_of_series)
+        target = torch.tensor(target)
 
         return input_, target, meta
 
@@ -264,8 +257,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
             scheduler.step()
         
         losses.update(loss.item(), len(data))
-        pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
         preds_all += [pred]
         targets_all += [target]
     
@@ -306,8 +299,8 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             losses.update(loss.item(), len(data))
 
             # 評価用にRMSEを算出
-            pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-            target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+            # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
             preds_all += [pred]
             targets_all += [target]
 
