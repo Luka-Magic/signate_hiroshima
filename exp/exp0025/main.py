@@ -219,9 +219,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     for step, (data, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
-        stations = meta['station']
-        print(stations)
-        print(len(stations))
+        stations = torch.tensor(list(map(int, meta['station']))).unsqueeze(-1).astype(torch.uint8).to(device)
 
         pred = model(data, target, stations, teacher_forcing_ratio).squeeze()
 
