@@ -151,6 +151,8 @@ class Encoder(nn.Module):
             st: (bs, 1)
         '''
         st = st.repeat(1, x.size()[1]) # (bs, len_of_series)
+        print(st)
+        print(st.shape)
         st_embed = self.st_embeddings(st) # (bs, input_seq_size, station_embed_size)
         _, h = self.lstm(x, h0) # -> x: (bs, input_seq_size, hidden_size)
         h = torch.cat([h, st_embed]) # -> h: (bs, input_seq_size, hidden_size+embed_size)
@@ -220,7 +222,10 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
         stations = torch.tensor(list(map(int, meta['station']))).unsqueeze(-1).int().to(device)
+        print(stations.shape)
+        print(stations)
         pred = model(data, target, stations, teacher_forcing_ratio).squeeze()
+        break
 
         # 評価用のlossの算出
         loss = 0
