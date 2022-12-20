@@ -310,7 +310,7 @@ def main():
         wandb.login()
     
     df, st_df = load_data(cfg, root_path)
-    n_stations = df['station'].nunique()
+    n_stations = st_df['stations'].nunique()
 
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
