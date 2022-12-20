@@ -9,8 +9,9 @@ save_model: True
 ######   MODEL   #############################
 model: LSTM
 input_size: 1
-station_embed_size: 32
+hidden_size: 128
 output_size: 1
+station_embed_size: 32
 input_sequence_size: 72
 output_sequence_size: 24
 teacher_forcing_ratio_rate: 0.955
