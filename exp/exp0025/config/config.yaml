@@ -2,20 +2,18 @@
 use_wandb: True
 wandb_project: signate_hiroshima
 water_csv_path: data/pre0001/waterlevel/data.csv
+water_st_csv_path: data/pre0001/waterlevel/stations.csv
 seed: 77
 save_model: True
 
 ######   MODEL   #############################
 model: LSTM
 input_size: 1
-hidden_size: 128
+station_embed_size: 32
 output_size: 1
 input_sequence_size: 72
 output_sequence_size: 24
 teacher_forcing_ratio_rate: 0.955
-tde_tau: 1
-tde_d: 1
-attention: True
 
 ######   DATA LOADER   #######################
 train_bs: 512
@@ -34,7 +32,7 @@ loss_fn: MSELoss
 
 # optimizer
 optimizer: AdamW
-lr: 1e-4
+lr: 1e-3
 weight_decay: 1e-6
 
 # scheduler

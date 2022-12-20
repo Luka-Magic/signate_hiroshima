@@ -221,7 +221,6 @@ class ScoringService(object):
         cls.train_rain, cls.rain_st, cls.train_tide, cls.tide_st, cls.train_water, \
             cls.water_st, cls.dam, cls.river, cls.river_system = get_data(data_dir)
 
-
         # 学習データを標準化
         df_data = cls.train_water.drop(columns=['date', 'hour'])
         df_data = df_data.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
