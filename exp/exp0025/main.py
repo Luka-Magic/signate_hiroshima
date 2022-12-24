@@ -268,9 +268,10 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
     for step, (data, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
+        stations = torch.tensor(list(map(int, meta['station']))).unsqueeze(-1).to(device).long()
 
         with torch.no_grad():
-            pred = model(data, target, 0.).squeeze()
+            pred = model(data, target, stations, 0.).squeeze()
 
             # 評価用のlossの算出
             loss = 0
