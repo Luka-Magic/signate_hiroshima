@@ -141,7 +141,7 @@ class HiroshimaDataset(Dataset):
 class Encoder(nn.Module):
     def __init__(self, input_size, hidden_size, stations_embed):
         super().__init__()
-        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(input_size=input_size+stations_embed[1], hidden_size=hidden_size, batch_first=True)
         self.st_embeddings = nn.Embedding(stations_embed[0], stations_embed[1])
         print(stations_embed)
     
@@ -153,17 +153,15 @@ class Encoder(nn.Module):
         '''
         st = st.repeat(1, x.size()[1]) # (bs, len_of_series)
         st_embed = self.st_embeddings(st) # (bs, input_seq_size, station_embed_size)
+        x = torch.cat([x, st_embed], axis=-1)
         _, h = self.lstm(x, h0) # -> x: (bs, input_seq_size, hidden_size)
-        print(h)
-        print(st_embed)
-        h = torch.cat([h, st_embed]) # -> h: (bs, input_seq_size, hidden_size+embed_size)
         return h
 
 
 class Decoder(nn.Module):
-    def __init__(self, hidden_size, output_size, stations_embed):
+    def __init__(self, hidden_size, output_size):
         super().__init__()
-        self.lstm = nn.LSTM(output_size, hidden_size + stations_embed, batch_first=True)
+        self.lstm = nn.LSTM(output_size, hidden_size, batch_first=True)
         self.fc = nn.Linear(hidden_size + stations_embed, output_size)
     
     def forward(self, x, h0=None):
