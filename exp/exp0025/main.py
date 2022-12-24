@@ -162,7 +162,7 @@ class Decoder(nn.Module):
     def __init__(self, hidden_size, output_size):
         super().__init__()
         self.lstm = nn.LSTM(output_size, hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size + stations_embed, output_size)
+        self.fc = nn.Linear(hidden_size, output_size)
     
     def forward(self, x, h0=None):
         '''
