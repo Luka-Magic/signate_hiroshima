@@ -184,7 +184,7 @@ class Model(nn.Module):
         self.device = device
         self.stations_embed = [n_stations, cfg.station_embed_size]
         self.encoder = Encoder(self.input_size, self.hidden_size, self.stations_embed)
-        self.decoder = Decoder(self.hidden_size, self.output_size, cfg.station_embed_size)
+        self.decoder = Decoder(self.hidden_size, self.output_size)
     
     def forward(self, x, target, stations, teacher_forcing_ratio):
         encoder_state = self.encoder(x, stations, h0=None)
