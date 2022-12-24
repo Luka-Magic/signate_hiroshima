@@ -11,7 +11,7 @@ model: LSTM
 input_size: 1
 hidden_size: 128
 output_size: 1
-station_embed_size: 6
+river_embed_size: 6
 input_sequence_size: 72
 output_sequence_size: 24
 teacher_forcing_ratio_rate: 0.955
