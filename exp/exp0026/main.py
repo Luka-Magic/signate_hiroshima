@@ -191,7 +191,6 @@ class Model(nn.Module):
         self.output_sequence_size = cfg.output_sequence_size
         self.device = device
         self.rivers_embed = [n_rivers, cfg.river_embed_size]
-        print(self.rivers_embed)
         self.encoder = Encoder(self.input_size, self.hidden_size, self.rivers_embed)
         self.decoder = Decoder(self.hidden_size, self.output_size)
     
@@ -230,7 +229,6 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
         rivers = torch.tensor(list(map(int, meta['river']))).unsqueeze(-1).to(device).long()
-        print(rivers)
         pred = model(data, target, rivers, teacher_forcing_ratio).squeeze() 
 
         # 評価用のlossの算出
