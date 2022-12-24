@@ -154,7 +154,7 @@ class Encoder(nn.Module):
         st = st.repeat(1, x.size()[1]) # (bs, len_of_series)
         st_embed = self.st_embeddings(st) # (bs, input_seq_size, station_embed_size)
         _, h = self.lstm(x, h0) # -> x: (bs, input_seq_size, hidden_size)
-        print(st_embed)
+        print(h)
         print(st_embed)
         h = torch.cat([h, st_embed]) # -> h: (bs, input_seq_size, hidden_size+embed_size)
         return h
