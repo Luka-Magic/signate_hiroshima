@@ -58,7 +58,7 @@ def preprocess(cfg, train_fold_df, valid_fold_df, st_df):
     # station_dfから値をとる
     st2river_df = st_df[['id', 'river']]
     st2river_df['id'] = st2river_df['id'].astype(str)
-    st2river = st2river.set_index('id').to_dict()['river']
+    st2river = st2river_df.set_index('id').to_dict()['river']
 
     st2info = {st: {'mean': st2mean[st], 'std': st2std[st], 'river': st2river[st]} for st in st2mean.keys()}
 
