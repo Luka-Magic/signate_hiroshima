@@ -143,7 +143,6 @@ class Encoder(nn.Module):
         super().__init__()
         self.lstm = nn.LSTM(input_size=input_size+stations_embed[1], hidden_size=hidden_size, batch_first=True)
         self.st_embeddings = nn.Embedding(stations_embed[0], stations_embed[1])
-        print(stations_embed)
     
     def forward(self, x, st, h0=None):
         '''
@@ -222,7 +221,6 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         target = target.to(device).float() # (bs, len_of_series)
         stations = torch.tensor(list(map(int, meta['station']))).unsqueeze(-1).to(device).long()
         pred = model(data, target, stations, teacher_forcing_ratio).squeeze()
-        break
 
         # 評価用のlossの算出
         loss = 0
