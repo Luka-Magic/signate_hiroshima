@@ -97,7 +97,6 @@ class HiroshimaDataset(Dataset):
         self.stations = []
         self.borders = []
 
-
         first_index = df.index[0]
         start_row = 24 # 最低でもはじめの24hは使う
         last_row = len(df) # 最後の行まで使う (最後の24hは推論用)
@@ -139,7 +138,7 @@ class HiroshimaDataset(Dataset):
         meta = self.st2info[station]
         meta['station'] = station
         meta['border'] = self.borders[idx]
-        meta['river'] = self.st2info['river']
+        meta['river'] = self.st2info[station]['river']
 
         input_ = torch.tensor(input_) # input_: (len_of_series, input_size)
         target = torch.tensor(target) # target: (len_of_series)
