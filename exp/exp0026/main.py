@@ -135,7 +135,7 @@ class HiroshimaDataset(Dataset):
     def __getitem__(self, idx):
         input_ = self.inputs[idx]
         target = self.targets[idx]
-        station = self.station[idx]
+        station = self.stations[idx]
         meta = self.st2info[station]
         meta['station'] = station
         meta['border'] = self.borders[idx]
