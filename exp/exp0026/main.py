@@ -39,7 +39,7 @@ def preprocess(cfg, train_fold_df, valid_fold_df, st_df):
 
     # train_fold_dfの数値部分(date, hour以外)の処理
     train_meta = train_fold_df[['date', 'hour']]
-    train_data = train_fold_df.dropcolumns=['date', 'hour', 'fold']
+    train_data = train_fold_df.drop(columns=['date', 'hour', 'fold'])
 
     ## train_fold_dfの標準化
     train_zscore_data = (train_data - train_data.mean(skipna=True)) / train_data.std(skipna=True)
