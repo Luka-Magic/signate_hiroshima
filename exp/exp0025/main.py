@@ -118,6 +118,7 @@ class HiroshimaDataset(Dataset):
                 pad = np.tile(np.array(input_[:, 0, :][:, np.newaxis, :]), (1, pad_length, 1))
                 input_ = np.concatenate([pad, input_], axis=1)
             
+
             self.inputs += input_.tolist()
             self.targets += target.values.T.tolist()
         print(f'{phase} datas: {len(self.inputs)}')
@@ -221,7 +222,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     for step, (data, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
         target = target.to(device).float() # (bs, len_of_series)
-        stations = torch.tensor(list(map(int, meta['station']))).unsqueeze(-1).to(device)
+        stations = torch.tensor(list(map(int, meta['station']))).unsqueeze(-1).to(device).long(ß)
         print(stations.shape)
         print(stations)
         pred = model(data, target, stations, teacher_forcing_ratio).squeeze()
