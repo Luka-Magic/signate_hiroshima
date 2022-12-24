@@ -23,13 +23,14 @@ import wandb
 def load_data(cfg, root_path):
     df = pd.read_csv(str(root_path / cfg.water_csv_path))
     st_df = pd.read_csv(str(root_path / cfg.water_st_csv_path))
+    river_table = pd.read_csv(str(root_path / cfg.river_table_path))
     dates = df['date'].astype(int).unique()
     dates.sort()
     folds = TimeSeriesSplit(n_splits=cfg.n_folds).split(dates)
     df['fold'] = -1
     for fold, (_, valid_dates) in enumerate(folds):
         df.loc[df['date'].isin(valid_dates), 'fold'] = fold
-    return df, st_df
+    return df, st_df, river_table
 
 
 def preprocess(cfg, train_fold_df, valid_fold_df, st_df):
@@ -319,8 +320,8 @@ def main():
     if cfg.use_wandb:
         wandb.login()
     
-    df, st_df = load_data(cfg, root_path)
-    n_rivers = st_df['river'].nunique()
+    df, st_df, river_table = load_data(cfg, root_path)
+    n_rivers = len(river_table)
 
     for fold in range(cfg.n_folds):
         if fold not in cfg.use_folds:
