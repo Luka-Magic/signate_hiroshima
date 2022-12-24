@@ -144,6 +144,7 @@ class Encoder(nn.Module):
         super().__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
         self.st_embeddings = nn.Embedding(stations_embed[0], stations_embed[1])
+        print(stations_embed)
     
     def forward(self, x, st, h0=None):
         '''
