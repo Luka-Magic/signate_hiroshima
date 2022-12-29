@@ -3,7 +3,7 @@ use_wandb: True
 wandb_project: signate_hiroshima
 water_csv_path: data/pre0001/waterlevel/data.csv
 water_st_csv_path: data/pre0001/waterlevel/stations.csv
-river_table_path: data/pre0001/river_table.csv
+system_table_path: data/pre0001/river_system_table.csv
 seed: 77
 save_model: True
 
