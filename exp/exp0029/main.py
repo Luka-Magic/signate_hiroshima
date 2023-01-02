@@ -36,7 +36,7 @@ def load_data(cfg, root_path):
     return df, water_st_df, rain_df, rain_st_df
 
 
-def preprocess(cfg, train_fold_df, valid_fold_df):
+def preprocess(cfg, train_fold_df, valid_fold_df, water_st_df, rain_df, rain_st_df):
     # dataframeの前処理
     train_fold_df = train_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
     valid_fold_df = valid_fold_df.apply(lambda x:pd.to_numeric(x, errors='coerce')).astype(float)
