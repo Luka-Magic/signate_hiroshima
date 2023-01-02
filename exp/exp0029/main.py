@@ -289,7 +289,7 @@ class Model(nn.Module):
         x = torch.cat([x, rain_map], dim=-1)
 
         encoder_state = self.encoder(x, h0=None)
-        decoder_input = x[:, -1:, :]
+        decoder_input = x[:, -1:, 0:1]
         decoder_state = encoder_state
 
         pred = torch.empty(len(x), self.output_sequence_size, self.output_size).to(self.device).float()
