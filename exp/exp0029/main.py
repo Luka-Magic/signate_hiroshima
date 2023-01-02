@@ -326,7 +326,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         rain_map = rain_map.to(device).float() # (bs, len_of_series, rain_map_size, rain_map_size)
         target = target.to(device).float() # (bs, len_of_series)
 
-        pred = model(data, rain_map, target, cfg.teacher_forcing_ratio).squeeze()
+        pred = model(data, rain_map, target, teacher_forcing_ratio).squeeze()
 
         # 評価用のlossの算出
         loss = 0
