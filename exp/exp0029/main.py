@@ -77,6 +77,7 @@ def preprocess(cfg, train_fold_df, valid_fold_df, water_st_df, rain_df, rain_st_
 class HiroshimaDataset(Dataset):
     def __init__(self, cfg, df, st2info, phase, water_st_df, rain_df, rain_st_df):
         super().__init__()
+        self.df = df
         self.st2info = st2info
         self.rain_map_size = cfg.rain_map_size
         self.clip_map_size = cfg.clip_map_size
