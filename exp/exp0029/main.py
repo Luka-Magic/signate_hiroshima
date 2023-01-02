@@ -374,7 +374,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
 
     pbar = tqdm(enumerate(dataloader), total=len(dataloader))
 
-    for step, (data, target, meta) in pbar:
+    for step, (data, rain_map, target, meta) in pbar:
         data = data.to(device).float() # (bs, len_of_series, input_size)
         rain_map = rain_map.to(device).float() # (bs, len_of_series, rain_map_size, rain_map_size)
         target = target.to(device).float() # (bs, len_of_series)
