@@ -24,7 +24,7 @@ test_bs: 512
 n_workers: 2
 
 ######   RAIN MAP   ##########################
-rain_map_size: 30
+rain_map_size: 20
 clip_map_size: 11
 
 ######   TRAIN   #############################
