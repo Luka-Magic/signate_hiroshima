@@ -264,7 +264,7 @@ class RainFeatureExtractor(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, hidden_size, ):
+    def __init__(self, input_size, hidden_size):
         super().__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
     
@@ -305,7 +305,7 @@ class Model(nn.Module):
         self.device = device
 
         self.rain_feature_extractor = RainFeatureExtractor(self.clip_map_size, self.rain_feature_size)
-        self.encoder = Encoder(self.input_size + self.rain_feature_size, self.hidden_size, self.output_size)
+        self.encoder = Encoder(self.input_size + self.rain_feature_size, self.hidden_size)
         self.decoder = Decoder(self.hidden_size, self.output_size)
     
     def forward(self, x, rain_map, target, teacher_forcing_ratio):
