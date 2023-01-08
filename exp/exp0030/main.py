@@ -240,8 +240,31 @@ def prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info, water_st_df, 
     return train_loader, valid_loader
 
 
+class RainFeatureExtractor(nn.Module):
+    def __init__(self, clip_map_size, rain_feature_size):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1, 4, kernel_size=3, stride=1, padding=1),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(4, 4, kernel_size=3, stride=1, padding=1),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
+            nn.ReLU()
+        )
+        image_feature_size = ((((clip_map_size+1) // 2) + 1) //2)
+        self.fc = nn.Linear(4*image_feature_size, rain_feature_size)
+    
+    def forward(self, x):
+        b, seq, h, w = x.size()
+        x = x.view(b*seq, 1, h, w)
+        x = self.conv(x) # (b*seq, 1, h_c, w_c)
+        x = x.view(b, seq, -1)
+        x = self.fc(x)
+        return x
+
+
 class Encoder(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, ):
         super().__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
     
@@ -277,19 +300,19 @@ class Model(nn.Module):
         self.clip_map_size = cfg.clip_map_size
         self.hidden_size = cfg.hidden_size
         self.output_size = cfg.output_size
+        self.rain_feature_size = cfg.rain_feature_size
         self.output_sequence_size = cfg.output_sequence_size
         self.device = device
 
-        self.encoder = Encoder(self.input_size + self.clip_map_size**2, self.hidden_size, self.output_size)
+        self.rain_feature_extractor = RainFeatureExtractor(self.clip_map_size, self.rain_feature_size)
+        self.encoder = Encoder(self.input_size + self.rain_feature_size, self.hidden_size, self.output_size)
         self.decoder = Decoder(self.hidden_size, self.output_size)
     
     def forward(self, x, rain_map, target, teacher_forcing_ratio):
-        bs, len_of_seq, h, w = rain_map.shape
-        rain_map = rain_map.view(bs, len_of_seq, h*w)
-        x = torch.cat([x, rain_map], dim=-1)
-
+        rain_map_feature = self.rain_feature_extractor(rain_map)
+        x = torch.cat([x, rain_map_feature], dim=-1)
         encoder_state = self.encoder(x, h0=None)
-        decoder_input = x[:, -1:, 0:1]
+        decoder_input = x[:, -1:, :1]
         decoder_state = encoder_state
 
         pred = torch.empty(len(x), self.output_sequence_size, self.output_size).to(self.device).float()
