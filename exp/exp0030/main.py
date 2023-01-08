@@ -251,8 +251,8 @@ class RainFeatureExtractor(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
             nn.ReLU()
         )
-        image_feature_size = ((((clip_map_size+1) // 2) + 1) //2)
-        self.fc = nn.Linear(4*image_feature_size, rain_feature_size)
+        image_feature_size = 4
+        self.fc = nn.Linear(4*image_feature_size**2, rain_feature_size)
     
     def forward(self, x):
         b, seq, h, w = x.size()
