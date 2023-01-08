@@ -16,7 +16,7 @@ output_size: 1
 input_sequence_size: 72
 output_sequence_size: 24
 teacher_forcing_ratio_rate: 0.955
-rain_feature_size = 16
+rain_feature_size: 16
 
 ######   DATA LOADER   #######################
 train_bs: 512
