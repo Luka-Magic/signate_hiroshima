@@ -279,7 +279,7 @@ class RainFeatureExtractor(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
             nn.ReLU()
         )
-        image_feature_size = 4
+        image_feature_size = 6
         self.fc = nn.Linear(4*image_feature_size**2, rain_feature_size)
     
     def forward(self, x):
@@ -401,7 +401,7 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         pbar.set_postfix(OrderedDict(loss=losses.avg))
         if np.isnan(losses.avg):
             raise ValueError
-        
+    
     if scheduler is not None and scheduler_step_time=='epoch':
         scheduler.step()
 
@@ -488,6 +488,8 @@ def main():
 
         train_fold_df, valid_fold_df, st2info, rain_df_p = preprocess(cfg, train_fold_df, valid_fold_df, water_st_df, rain_df, rain_st_df)
         train_loader, valid_loader = prepare_dataloader(cfg, train_fold_df, valid_fold_df, st2info, water_st_df, rain_df_p, rain_st_df)
+        del train_fold_df, valid_fold_df, st2info, rain_df_p
+        gc.collect()
 
         model = Model(cfg, device).to(device)
 
@@ -543,7 +545,7 @@ def main():
                 wandb.log(wandb_dict)
         
         wandb.finish()
-        del model, train_fold_df, valid_fold_df, train_loader, valid_loader, loss_fn, optimizer, best_dict, st2info, rain_df_p
+        del model, train_loader, valid_loader, loss_fn, optimizer, best_dict
         gc.collect()
         torch.cuda.empty_cache()
 
