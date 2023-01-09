@@ -145,6 +145,7 @@ class HiroshimaDataset(Dataset):
         rain_id2xy['y'] = ((self.rain_map_size-1) * ((y - y.min()) / (y.max() - y.min()))).astype(np.uint8)
         rain_id2xy = rain_id2xy[['id', 'x', 'y']]
         self.rain_id2xy = rain_id2xy[~rain_id2xy[['x', 'y']].duplicated()]
+        del rain_id2xy
 
         # xyhour: 最終的なデータをこのdataframeにleftjoinして, valuesをreshapeして(time, x, y)の形にする。
         data_list = []
@@ -154,6 +155,8 @@ class HiroshimaDataset(Dataset):
                     data_list.append([x_, y_, hour])
         self.xyhour = pd.DataFrame(data=data_list, columns=['x', 'y', 'hour'])
         self.xyhour = self.xyhour.astype(np.uint8)
+        del data_list
+        gc.collect()
 
         # water_id2xy: water_idがそれぞれどの座標(x, y)にあたるかを示すdict
         water_id2xy = self.water_st_df[['id', '緯度', '経度']].dropna()
