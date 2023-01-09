@@ -205,7 +205,6 @@ class HiroshimaDataset(Dataset):
                 入力に使う水位の時間と観測所の位置からrain_mapの一部を切り取り入力に使う。
                 cfg.clip_map_sizeを一辺、時間の長さはcfg.input_sequence_size
                 また端っこでも切り取れるように先にpaddingをしてから切り取り
-
         """
         # もしｗaterデータの座標がない場合は全て0
         if int(station) not in self.water_id2xy['x']:
@@ -360,8 +359,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     
     model.train()
 
-    preds_all = []
-    targets_all = []
+    # preds_all = []
+    # targets_all = []
 
     losses = AverageMeter()
 
@@ -394,10 +393,10 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
             scheduler.step()
         
         losses.update(loss.item(), len(data))
-        pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
-        preds_all += [pred]
-        targets_all += [target]
+        # pred = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        # target = (target.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
+        # preds_all += [pred]
+        # targets_all += [target]
         pbar.set_postfix(OrderedDict(loss=losses.avg))
         if np.isnan(losses.avg):
             raise ValueError
@@ -405,11 +404,12 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
     if scheduler is not None and scheduler_step_time=='epoch':
         scheduler.step()
 
-    preds_all = np.concatenate(preds_all)
-    targets_all = np.concatenate(targets_all)
-    score = rmse(targets_all, preds_all)
+    # preds_all = np.concatenate(preds_all)
+    # targets_all = np.concatenate(targets_all)
+    # score = rmse(targets_all, preds_all)
 
     lr = get_lr(optimizer)
+    score = float('nan')
     
     print(f'Train - Epoch {epoch}: losses {losses.avg:.4f}, scores: {score}')
     return score, losses.avg, lr, teacher_forcing_ratio
