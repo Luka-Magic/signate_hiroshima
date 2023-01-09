@@ -25,13 +25,13 @@ test_bs: 512
 n_workers: 2
 
 ######   RAIN MAP   ##########################
-rain_map_size: 20
+rain_map_size: 30
 clip_map_size: 11
 
 ######   TRAIN   #############################
 # basic
 n_folds: 3
-use_folds: [0, 1, 2]
+use_folds: [2]
 n_epochs: 100 
 
 # Loss

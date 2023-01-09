@@ -66,10 +66,13 @@ def preprocess(cfg, train_fold_df, valid_fold_df, water_st_df, rain_df, rain_st_
     rain_data = rain_df.drop(columns=['date', 'hour'])
     # 差分をとる
     rain_data = rain_data - rain_data.shift()
-    # 標準化
-    rain_data = (rain_data - np.nanmean(rain_data.values)) / np.nanstd(rain_data.values)
     # nan埋め
     rain_data = rain_data.fillna(0.)
+    # minmaxscale
+    rain_data = ((rain_data - np.nanmin(rain_data.values)) / (np.nanmax(rain_data.values) - np.nanmin(rain_data.values))) * 255.
+    # int化
+    rain_data = rain_data.astype(np.uint8)
+
     rain_df = pd.concat([rain_meta, rain_data], axis=1)
     return train_fold_df, valid_fold_df, st2info, rain_df
 
@@ -83,6 +86,8 @@ class HiroshimaDataset(Dataset):
         self.clip_map_size = cfg.clip_map_size
         self.input_sequence_size = cfg.input_sequence_size
         self.rain_df = rain_df
+        self.rain_st_df = rain_st_df
+        self.water_st_df = water_st_df
 
         self.inputs = []
         self.targets = []
@@ -139,6 +144,7 @@ class HiroshimaDataset(Dataset):
         rain_id2xy['y'] = ((self.rain_map_size-1) * ((y - y.min()) / (y.max() - y.min()))).astype(int)
         rain_id2xy = rain_id2xy[['id', 'x', 'y']]
         self.rain_id2xy = rain_id2xy[~rain_id2xy[['x', 'y']].duplicated()]
+
         # xyhour: 最終的なデータをこのdataframeにleftjoinして, valuesをreshapeして(time, x, y)の形にする。
         data_list = []
         for hour in range(len(self.df)):
@@ -146,26 +152,37 @@ class HiroshimaDataset(Dataset):
                 for x_ in range(self.rain_map_size):
                     data_list.append([x_, y_, hour])
         self.xyhour = pd.DataFrame(data=data_list, columns=['x', 'y', 'hour'])
+        self.xyhour = self.xyhour.astype(np.uint8)
+
         # water_id2xy: water_idがそれぞれどの座標(x, y)にあたるかを示すdict
         water_id2xy = water_st_df[['id', '緯度', '経度']].dropna()
         water_x = water_id2xy['経度'].values
         water_y = water_id2xy['緯度'].values
-        water_id2xy['x'] = ((self.rain_map_size-1) * ((water_x - x.min()) / (x.max() - x.min()))).astype(int)
-        water_id2xy['y'] = ((self.rain_map_size-1) * ((water_y - y.min()) / (y.max() - y.min()))).astype(int)
+        water_id2xy['x'] = ((self.rain_map_size-1) * ((water_x - x.min()) / (x.max() - x.min()))).astype(np.uint8)
+        water_id2xy['y'] = ((self.rain_map_size-1) * ((water_y - y.min()) / (y.max() - y.min()))).astype(np.uint8)
         self.water_id2xy = water_id2xy[['id', 'x', 'y']].set_index('id').to_dict()
 
         # rain_id2value: idとvalueの組み合わせをrainfallデータから作成
         rain_border = self.rain_df.drop(columns=['date', 'hour'])
-        rain_id2value = rain_border.stack(dropna=False).reset_index().rename(columns={'level_0': 'index', 'level_1': 'id', 0: 'value'}).astype({'id': int})# id, value
+        rain_id2value = rain_border.stack(dropna=False).reset_index() \
+            .rename(columns={'level_0': 'index', 'level_1': 'id', 0: 'value'}).astype({'id': int, 'value': np.uint8}) # id, value
         rain_id2value = rain_id2value.rename(columns={'index': 'hour'})
+        
         # xy2value: mergeによりそれぞれのrainfallのデータがどの座標かを対応させる。
         xy2value = pd.merge(rain_id2value, self.rain_id2xy, on='id', how='left')
+        del rain_id2value
         # mapping_df: mergeにより全ての(time, x, y)においてどのデータがあるかを対応させる
         mapping_df = pd.merge(self.xyhour, xy2value, on=['x', 'y', 'hour'], how='left')
+        del self.xyhour
+        mapping_df = mapping_df.fillna(0).astype({'value': np.uint8})
+        gc.collect()
 
         # arrayに変換してnan埋め
-        rain_map = mapping_df['value'].values.reshape(-1, self.rain_map_size, self.rain_map_size)
-        self.rain_map = np.nan_to_num(rain_map, nan=0.)
+        self.rain_map = mapping_df['value'].values.reshape(-1, self.rain_map_size, self.rain_map_size)
+        del mapping_df
+        gc.collect()
+        self.rain_map = np.nan_to_num(self.rain_map, nan=0)
+        gc.collect()
     
     def __len__(self):
         return len(self.inputs)
