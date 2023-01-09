@@ -175,17 +175,14 @@ class HiroshimaDataset(Dataset):
         # xy2value: mergeによりそれぞれのrainfallのデータがどの座標かを対応させる。
         xy2value = pd.merge(rain_id2value, self.rain_id2xy, on='id', how='left')
         del rain_id2value, rain_border
-        print(xy2value.info())
         # mapping_df: mergeにより全ての(time, x, y)においてどのデータがあるかを対応させる
         print(f'RAM memory used (before creating mapping_df): {psutil.virtual_memory()[2]}%')
         mapping_df = pd.merge(self.xyhour, xy2value, on=['x', 'y', 'hour'], how='left')
         del self.xyhour, xy2value
         gc.collect()
         print(f'RAM memory used (created mapping_df): {psutil.virtual_memory()[2]}%')
-        print(mapping_df.info())
         mapping_df = mapping_df.fillna(0).astype({'value': np.uint8})
         print(f'RAM memory used (mapping_df preprocess): {psutil.virtual_memory()[2]}%')
-        print(mapping_df.info())
         gc.collect()
         print(f'RAM memory used (before create rain_map): {psutil.virtual_memory()[2]}%')
 
@@ -241,7 +238,7 @@ class HiroshimaDataset(Dataset):
 
         # 水位の入力の時間と位置からrain_mapを作成
         rain_map = self._get_clip_map(meta['border'], meta['station'])
-        rain_map = torch.tensor(rain_map)
+        rain_map = torch.tensor(rain_map).float()
 
         input_ = torch.tensor(input_) # input_: (len_of_series, input_size)
         target = torch.tensor(target) # target: (len_of_series)
