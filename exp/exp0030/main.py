@@ -141,8 +141,8 @@ class HiroshimaDataset(Dataset):
         rain_id2xy = self.rain_st_df[['id', '緯度', '経度']].dropna()
         x = rain_id2xy['経度'].values
         y = rain_id2xy['緯度'].values
-        rain_id2xy['x'] = ((self.rain_map_size-1) * ((x - x.min()) / (x.max() - x.min()))).astype(int)
-        rain_id2xy['y'] = ((self.rain_map_size-1) * ((y - y.min()) / (y.max() - y.min()))).astype(int)
+        rain_id2xy['x'] = ((self.rain_map_size-1) * ((x - x.min()) / (x.max() - x.min()))).astype(np.uint8)
+        rain_id2xy['y'] = ((self.rain_map_size-1) * ((y - y.min()) / (y.max() - y.min()))).astype(np.uint8)
         rain_id2xy = rain_id2xy[['id', 'x', 'y']]
         self.rain_id2xy = rain_id2xy[~rain_id2xy[['x', 'y']].duplicated()]
 
