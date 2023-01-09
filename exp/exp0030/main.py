@@ -3,6 +3,7 @@ import gc
 import random
 import numpy as np
 import pandas as pd
+import os, psutil
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
@@ -125,9 +126,9 @@ class HiroshimaDataset(Dataset):
             self.targets += target.values.T.tolist()
         print(f'{phase} datas: {len(self.inputs)}')
 
-        self._create_rain_map(rain_st_df, water_st_df)
+        self._create_rain_map()
     
-    def _create_rain_map(self, rain_st_df, water_st_df):
+    def _create_rain_map(self):
         """
             rain_mapを作成する。
 
@@ -137,7 +138,7 @@ class HiroshimaDataset(Dataset):
                 時間方向を合わせて3次元になる(time, x, y)。
         """
         # rain_id2xy: rain_idがそれぞれどの座標(x. y)にあたるかを示すdataframe
-        rain_id2xy = rain_st_df[['id', '緯度', '経度']].dropna()
+        rain_id2xy = self.rain_st_df[['id', '緯度', '経度']].dropna()
         x = rain_id2xy['経度'].values
         y = rain_id2xy['緯度'].values
         rain_id2xy['x'] = ((self.rain_map_size-1) * ((x - x.min()) / (x.max() - x.min()))).astype(int)
@@ -155,7 +156,7 @@ class HiroshimaDataset(Dataset):
         self.xyhour = self.xyhour.astype(np.uint8)
 
         # water_id2xy: water_idがそれぞれどの座標(x, y)にあたるかを示すdict
-        water_id2xy = water_st_df[['id', '緯度', '経度']].dropna()
+        water_id2xy = self.water_st_df[['id', '緯度', '経度']].dropna()
         water_x = water_id2xy['経度'].values
         water_y = water_id2xy['緯度'].values
         water_id2xy['x'] = ((self.rain_map_size-1) * ((water_x - x.min()) / (x.max() - x.min()))).astype(np.uint8)
@@ -170,19 +171,29 @@ class HiroshimaDataset(Dataset):
         
         # xy2value: mergeによりそれぞれのrainfallのデータがどの座標かを対応させる。
         xy2value = pd.merge(rain_id2value, self.rain_id2xy, on='id', how='left')
-        del rain_id2value
+        del rain_id2value, rain_border
+        print(xy2value.info())
         # mapping_df: mergeにより全ての(time, x, y)においてどのデータがあるかを対応させる
+        print(f'RAM memory used (before creating mapping_df): {psutil.virtual_memory()[2]}%')
         mapping_df = pd.merge(self.xyhour, xy2value, on=['x', 'y', 'hour'], how='left')
-        del self.xyhour
-        mapping_df = mapping_df.fillna(0).astype({'value': np.uint8})
+        del self.xyhour, xy2value
         gc.collect()
+        print(f'RAM memory used (created mapping_df): {psutil.virtual_memory()[2]}%')
+        print(mapping_df.info())
+        mapping_df = mapping_df.fillna(0).astype({'value': np.uint8})
+        print(f'RAM memory used (mapping_df preprocess): {psutil.virtual_memory()[2]}%')
+        print(mapping_df.info())
+        gc.collect()
+        print(f'RAM memory used (before create rain_map): {psutil.virtual_memory()[2]}%')
 
         # arrayに変換してnan埋め
         self.rain_map = mapping_df['value'].values.reshape(-1, self.rain_map_size, self.rain_map_size)
+        print(f'RAM memory used (created rain_map): {psutil.virtual_memory()[2]}%')
         del mapping_df
         gc.collect()
         self.rain_map = np.nan_to_num(self.rain_map, nan=0)
         gc.collect()
+        print(f'RAM memory used (rain_map all completed!): {psutil.virtual_memory()[2]}%')
     
     def __len__(self):
         return len(self.inputs)
