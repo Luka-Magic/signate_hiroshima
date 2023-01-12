@@ -250,7 +250,7 @@ class ScoringService(object):
                 data = data.to(cls.device).float()
 
                 with torch.no_grad():
-                    pred = model(data).squeeze()
+                    pred = model(data, None, 0.0).squeeze()
 
                     preds = (pred.detach().cpu().numpy() * meta['std'].unsqueeze(-1).numpy() + meta['mean'].unsqueeze(-1).numpy())
                     preds_one_model.append(preds)
