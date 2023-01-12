@@ -221,8 +221,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         # for i in range(pred.size()[1]):
         #     loss += loss_fn(pred[:, i], target[:, i])
         # losses.update(loss.item(), len(data))
-        # loss = loss_fn((pred * meta['std'].unsqueeze(-1)).view(-1), (target * meta['std'].unsqueeze(-1)).view(-1))
-        loss = loss_fn(pred.view(-1), target.view(-1))
+        loss = loss_fn((pred * meta['std'].unsqueeze(-1)).view(-1), (target * meta['std'].unsqueeze(-1)).view(-1))
+        # loss = loss_fn(pred.view(-1), target.view(-1))
         
         optimizer.zero_grad()
 
@@ -269,9 +269,7 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             pred = model(data, target, 0.).squeeze()
 
             # 評価用のlossの算出
-            loss = 0
-            for i in range(pred.size()[1]):
-                loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目をsqueeze
+            loss = loss_fn((pred * meta['std'].unsqueeze(-1)).view(-1), (target * meta['std'].unsqueeze(-1)).view(-1))
             losses.update(loss.item(), len(data))
 
             # 評価用にRMSEを算出
