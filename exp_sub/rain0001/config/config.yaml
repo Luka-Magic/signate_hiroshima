@@ -1,6 +1,6 @@
 ######   BASIC   #############################
 use_wandb: True
-wandb_project: signate_hiroshima
+wandb_project: signate_hiroshima_sub
 rain_csv_path: data/pre0001/rainfall/data.csv
 seed: 77
 save_model: True
