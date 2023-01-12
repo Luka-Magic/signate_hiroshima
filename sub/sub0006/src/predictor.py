@@ -85,36 +85,23 @@ class Encoder(nn.Module):
             x: (bs, len_of_series ,input_size)
             h0 = Tuple(h, c)
         '''
-        hs, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
-        return hs, h
+        _, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
+        return h
 
 
 class Decoder(nn.Module):
-    def __init__(self, hidden_size, output_size, attention=True):
+    def __init__(self, hidden_size, output_size):
         super().__init__()
-        self.attention = attention
-
         self.lstm = nn.LSTM(output_size, hidden_size, batch_first=True)
-        self.softmax = nn.Softmax(dim=1)
-        if attention:
-            self.fc = nn.Linear(hidden_size*2, output_size)
-        else:
-            self.fc = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x, h, hs):
+        self.fc = nn.Linear(hidden_size, output_size)
+    
+    def forward(self, x, h0=None):
         '''
-            x: (bs, output_seq_size=1, output_size=1)
+            x: (bs, len_of_series ,output_size)
             h = Tuple(h, c)
-            hs = (bs, input_seq_size, hidden_size)
         '''
-        x, h = self.lstm(x, h) # x: (bs, output_seq_size=1, hidden_size)
-        if self.attention:
-            x_t = torch.transpose(x, 1, 2)
-            attention_weight = self.softmax(torch.bmm(hs, x_t)) # attention_weight: (bs, input_seq_size, output_seq_size=1)
-            weighted_hs = hs * attention_weight # weighted_hs: (bs, input_seq_size, hidden_size)
-            context = torch.sum(weighted_hs, dim=1, keepdim=True) # context: (bs, 1, hidden_size)
-            x = torch.cat([x, context], dim=2) # (bs, 1, hidden_size*2)
-        x = self.fc(x) # x: (bs, 1, output_size)
+        x, h = self.lstm(x, h0) # -> x: (bs, len_of_series, hidden_size)
+        x = self.fc(x) # -> x: (bs, len_of_series, output_size)
         return x, h
 
 
@@ -128,20 +115,22 @@ class Model(nn.Module):
         self.device = device
 
         self.encoder = Encoder(self.input_size, self.hidden_size, self.output_size)
-        self.decoder = Decoder(self.hidden_size, self.output_size, attention=cfg.attention)
+        self.decoder = Decoder(self.hidden_size, self.output_size)
     
-    def forward(self, x):
-        hs, encoder_state = self.encoder(x, h0=None)
-        decoder_input = x[:, -1:, :1]
+    def forward(self, x, target, teacher_forcing_ratio):
+        encoder_state = self.encoder(x, h0=None)
+        decoder_input = x[:, -1:, :]
         decoder_state = encoder_state
 
         pred = torch.empty(len(x), self.output_sequence_size, self.output_size).to(self.device).float()
 
         for i in range(self.output_sequence_size):
-            decoder_output, decoder_state = self.decoder(decoder_input, decoder_state, hs) # decoder_output: (bs, 1, output_size=1)
+            decoder_output, decoder_state = self.decoder(decoder_input, decoder_state) # decoder_output: (bs, 1, output_size=1)
             pred[:, i:i+1, :] = decoder_output
-            decoder_input = decoder_output
+            teacher_force = random.random() < teacher_forcing_ratio
+            decoder_input = target[:, i:i+1].unsqueeze(-1) if teacher_force else decoder_output
         return pred
+
 
 
 def load_models(cfg, model_dir, device):
