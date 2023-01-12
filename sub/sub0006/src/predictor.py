@@ -32,13 +32,11 @@ class HiroshimaDataset(Dataset):
         super().__init__()
         self.st2info = st2info
 
-        self.d = cfg.tde_d
-        self.tau = cfg.tde_tau
         self.input_sequence_size = cfg.input_sequence_size
         
         input_ = df.iloc[-1*cfg.input_sequence_size:].drop(columns=['date', 'hour'])
 
-        input_length = self.input_sequence_size + (self.d - 1) * self.tau
+        input_length = self.input_sequence_size
 
         # nan埋め
         input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
@@ -65,13 +63,7 @@ class HiroshimaDataset(Dataset):
 
         meta = self.st2info[self.stations[idx]]
         meta['station'] = self.stations[idx]
-        if self.d > 1:
-            input_tde = np.zeros((self.input_sequence_size, self.d))
-            for i in range(self.d):
-                input_tde[:, i] = np.roll(input_, i*self.tau)[(self.d - 1)*self.tau:]
-            input_ = torch.tensor(input_tde) # input_: (len_of_series, input_size)
-        else:
-            input_ = torch.tensor(input_).unsqueeze(-1)
+        input_ = torch.tensor(input_).unsqueeze(-1)
         return input_, meta
 
 
