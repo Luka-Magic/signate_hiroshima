@@ -25,8 +25,8 @@ test_bs: 512
 n_workers: 2
 
 ######   RAIN MAP   ##########################
-rain_map_size: 100
-clip_map_size: 73 # value % 4 == 1
+rain_map_size: 50
+clip_map_size: 33 # value % 4 == 1
 
 ######   TRAIN   #############################
 # basic
