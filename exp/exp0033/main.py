@@ -101,7 +101,7 @@ class HiroshimaDataset(Dataset):
             input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
             input_ = input_.loc[:, (~input_.isnull()).sum(axis=0) >= 2] # inputでnullでない値が2つ以上ある列のみ採用
             input_ = input_.interpolate(method='pchip')
-            
+
             input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
             input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
             input_ = input_.fillna(0.) # 全てがnanなら０埋め
@@ -109,7 +109,7 @@ class HiroshimaDataset(Dataset):
             target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
 
             target = target.loc[:, ~target.isnull().any(axis=0)] # targetにnullがない列だけ抜き出す
-            columns = list(set(input_.columns) - set(target.columns))
+            columns = list(set(input_.columns) & set(target.columns))
             self.stations += columns
             self.borders += [first_index + border]*len(columns)
             input_ = input_.loc[:, columns] # targetに使われるinputだけ取り出す
