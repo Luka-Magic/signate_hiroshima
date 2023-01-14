@@ -99,16 +99,17 @@ class HiroshimaDataset(Dataset):
             assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
             
             input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
-            input_ = input_.loc[:, ~input_.isnull().all(axis=0)] # input全てnullなら消す
+            input_ = input_.loc[:, input_.isnull().sum(axis=0)>1] # inputでnullが2つ以上ある列のみ採用
             input_ = input_.interpolate(method='pchip')
             input_ = input_.fillna(0.) # 全てがnanなら０埋め
             
             target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
 
             target = target.loc[:, ~target.isnull().any(axis=0)] # targetにnullがない列だけ抜き出す
-            self.stations += target.columns.tolist()
-            self.borders += [first_index + border]*len(target.columns)
-            input_ = input_.loc[:, target.columns] # targetに使われるinputだけ取り出す
+            columns = list(set(target.columns) - set(input_.columns))
+            self.stations += columns
+            self.borders += [first_index + border]*len(columns)
+            input_ = input_.loc[:, columns] # targetに使われるinputだけ取り出す
             input_ = input_.values.T[:, :, np.newaxis] # size=(len(station), len(時間), 1)
 
             # 入力の長さがRNNの入力に足りないとき => 前にpadding
