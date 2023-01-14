@@ -97,11 +97,10 @@ class HiroshimaDataset(Dataset):
          # borderはある日の0時を示し、inputはそれより前のsequenceの長さ時間(例えば30時間分)、targetはborder以降の24時間分を使う
         for border in tqdm(range(start_row, last_row, 24)):
             assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
-            
             input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
-            input_ = input_.loc[:, (~input_.isnull()).sum(axis=0) >= 2] # inputでnullでない値が2つ以上ある列のみ採用
-            input_ = input_.interpolate(method='pchip')
-
+            if phase == 'train':
+                input_ = input_.loc[:, (~input_.isnull()).sum(axis=0) >= 2] # inputでnullでない値が2つ以上ある列のみ採用
+                input_ = input_.interpolate(method='pchip')
             input_ = input_.fillna(method='ffill') # まず新しいデータで前のnanを埋める
             input_ = input_.fillna(method='bfill') # 新しいデータがnanだった場合は古いデータで埋める
             input_ = input_.fillna(0.) # 全てがnanなら０埋め
