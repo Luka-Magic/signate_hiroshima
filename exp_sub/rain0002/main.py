@@ -266,9 +266,8 @@ def train_one_epoch(cfg, epoch, dataloader, model, loss_fn, device, optimizer, s
         pred = model(data, target, teacher_forcing_ratio).squeeze()
 
         # 評価用のlossの算出
-        loss = 0
-        for i in range(pred.size()[1]):
-            loss += loss_fn(pred[:, i], target[:, i])
+        std = meta['std'].unsqueeze(-1).to(device).float()
+        loss = loss_fn((pred * std).view(-1), (target * std).view(-1))
         losses.update(loss.item(), len(data))
         
         optimizer.zero_grad()
@@ -320,9 +319,8 @@ def valid_one_epoch(cfg, epoch, dataloader, model, loss_fn, device):
             pred = model(data, target, 0.).squeeze()
 
             # 評価用のlossの算出
-            loss = 0
-            for i in range(pred.size()[1]):
-                loss += loss_fn(pred[:, i], target[:, i]) # output_sizeは1なのでpredの3次元目をsqueeze
+            std = meta['std'].unsqueeze(-1).to(device).float()
+            loss = loss_fn((pred * std).view(-1), (target * std).view(-1))
             losses.update(loss.item(), len(data))
 
             # 評価用にRMSEを算出
