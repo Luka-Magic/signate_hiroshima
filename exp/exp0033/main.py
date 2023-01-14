@@ -99,6 +99,7 @@ class HiroshimaDataset(Dataset):
             assert df.iloc[border]['hour'] == 0, '行が0時スタートになってない。'
             
             input_ = df.iloc[max(border-cfg.input_sequence_size, 0):border, :].drop(columns=['date', 'hour'])
+            input_ = input_.loc[:, ~input_.isnull().all(axis=1)] # input全てnullなら消す
             input_ = input_.interpolate(method='pchip')
             input_ = input_.fillna(0.) # 全てがnanなら０埋め
             
