@@ -113,6 +113,7 @@ class HiroshimaDataset(Dataset):
             self.stations += columns
             self.borders += [first_index + border]*len(columns)
             input_ = input_.loc[:, columns] # targetに使われるinputだけ取り出す
+            target = target.loc[:, columns]
             input_ = input_.values.T[:, :, np.newaxis] # size=(len(station), len(時間), 1)
 
             # 入力の長さがRNNの入力に足りないとき => 前にpadding
