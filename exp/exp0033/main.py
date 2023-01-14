@@ -106,8 +106,7 @@ class HiroshimaDataset(Dataset):
             target = df.iloc[border:border+24, :].drop(columns=['date', 'hour'])
 
             target = target.loc[:, ~target.isnull().any(axis=0)] # targetにnullがない列だけ抜き出す
-            columns = list(set(target.columns) - set(input_.columns))
-            print(columns)
+            columns = list(set(input_.columns) - set(target.columns))
             self.stations += columns
             self.borders += [first_index + border]*len(columns)
             input_ = input_.loc[:, columns] # targetに使われるinputだけ取り出す
