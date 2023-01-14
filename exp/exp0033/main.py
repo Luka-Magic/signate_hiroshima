@@ -107,6 +107,7 @@ class HiroshimaDataset(Dataset):
 
             target = target.loc[:, ~target.isnull().any(axis=0)] # targetにnullがない列だけ抜き出す
             columns = list(set(target.columns) - set(input_.columns))
+            print(columns)
             self.stations += columns
             self.borders += [first_index + border]*len(columns)
             input_ = input_.loc[:, columns] # targetに使われるinputだけ取り出す
